@@ -1,101 +1,112 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  MOCK_PROGRAMS,
+  type Program,
+  type ProgramDay,
+} from "../lib/mockPrograms";
 
 const PRIMARY = "#0df20d";
 
-const SUMMARY_CARDS = [
-  {
-    icon: "calendar-outline" as const,
-    value: "8 Weeks",
-    label: "Duration",
-  },
-  {
-    icon: "repeat-outline" as const,
-    value: "4 Days/Week",
-    label: "Frequency",
-  },
-  {
-    icon: "barbell" as const,
-    value: "Strength & Hypertrophy",
-    label: "Goal",
-  },
-  {
-    icon: "person-circle-outline" as const,
-    value: "Alex Ray",
-    label: "Trainer",
-  },
-];
+type ProgramDetailsParams = {
+  programId?: string;
+};
 
-const WEEKS = [1, 2, 3, 4, 5, 6, 7, 8];
+function findProgram(programId?: string): Program {
+  if (programId) {
+    const fromId = MOCK_PROGRAMS.find((p) => p.id === programId);
+    if (fromId) return fromId;
+  }
+  return MOCK_PROGRAMS[0];
+}
 
-type DayStatus = "completed" | "inProgress" | "notStarted";
-
-const DAYS: {
-  id: string;
-  title: string;
-  subtitle: string;
-  status: string;
-  statusType: DayStatus;
-}[] = [
-  {
-    id: "day1",
-    title: "Day 1",
-    subtitle: "Chest, Triceps",
-    status: "Completed",
-    statusType: "completed",
-  },
-  {
-    id: "day2",
-    title: "Day 2",
-    subtitle: "Back, Biceps",
-    status: "In Progress",
-    statusType: "inProgress",
-  },
-  {
-    id: "day3",
-    title: "Day 3",
-    subtitle: "Legs, Core",
-    status: "Not Started",
-    statusType: "notStarted",
-  },
-  {
-    id: "day4",
-    title: "Day 4",
-    subtitle: "Shoulders, Abs",
-    status: "Not Started",
-    statusType: "notStarted",
-  },
-];
+function groupDaysByWeek(program: Program): [number, ProgramDay[]][] {
+  const map = new Map<number, ProgramDay[]>();
+  for (const day of program.days) {
+    const arr = map.get(day.weekIndex) ?? [];
+    arr.push(day);
+    map.set(day.weekIndex, arr);
+  }
+  return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
+}
 
 export default function ProgramDetailsScreen() {
   const router = useRouter();
-  const activeWeek = 1; // later this will be state/dynamic
+  const params = useLocalSearchParams<ProgramDetailsParams>();
 
-  const handleDayPress = (dayId: string) => {
-    // Later: pass program + week + day
-    router.push("/workout-day");
+  const program = findProgram(params.programId);
+  const weeks = groupDaysByWeek(program);
+
+  const completion =
+    program.progress.totalWorkouts > 0
+      ? program.progress.completedWorkouts / program.progress.totalWorkouts
+      : 0;
+
+  const completionPercent = Math.round(completion * 100);
+
+  const summaryCards = [
+    {
+      icon: "calendar-outline" as const,
+      value: `${program.durationWeeks} Weeks`,
+      label: "Duration",
+    },
+    {
+      icon: "repeat-outline" as const,
+      value: `${program.daysPerWeek} Days/Week`,
+      label: "Frequency",
+    },
+    {
+      icon: "barbell-outline" as const,
+      value: program.level,
+      label: "Level",
+    },
+    {
+      icon: "trending-up-outline" as const,
+      value: `${completionPercent}%`,
+      label: "Completed",
+    },
+  ];
+
+  const sourceLabel =
+    program.source === "coach" ? "Coach program" : "My program";
+
+  const startDay =
+    program.days.find((d) => d.status === "today") ?? program.days[0];
+
+  const handleStartToday = () => {
+    if (!startDay) return;
+    router.push({
+      pathname: "/workout-day",
+      params: { programId: program.id, dayId: startDay.id },
+    });
+  };
+
+  const handleDayPress = (day: ProgramDay) => {
+    router.push({
+      pathname: "/workout-day",
+      params: { programId: program.id, dayId: day.id },
+    });
   };
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
       {/* Header */}
-      <View className="border-b border-white/10 bg-[#050816]/90 px-4 pb-3 pt-3">
+      <View className="border-b border-white/10 bg-[#050816]/80 px-4 pb-3 pt-4">
         <View className="flex-row items-center justify-between">
           <TouchableOpacity
-            className="h-10 w-10 items-center justify-center rounded-full bg-white/10"
+            className="h-9 w-9 items-center justify-center rounded-full bg-white/10"
             onPress={() => router.back()}
           >
             <Ionicons name="chevron-back" size={20} color="#ffffff" />
           </TouchableOpacity>
 
-          <Text className="flex-1 text-center text-lg font-bold text-white">
-            Ultimate Strength Builder
+          <Text className="flex-1 px-2 text-center text-base font-semibold text-slate-100">
+            Program details
           </Text>
 
-          {/* Spacer to keep title centered */}
-          <View className="w-10" />
+          <View className="h-9 w-9" />
         </View>
       </View>
 
@@ -104,140 +115,174 @@ export default function ProgramDetailsScreen() {
           className="flex-1"
           contentContainerStyle={{
             paddingHorizontal: 16,
-            paddingTop: 10,
-            paddingBottom: 24,
+            paddingTop: 16,
+            paddingBottom: 120,
           }}
         >
-          {/* ===== Program summary grid ===== */}
-          <View className="mb-6">
-            <View className="flex-row gap-4 mb-4">
-              {SUMMARY_CARDS.slice(0, 2).map((card) => (
-                <View
-                  key={card.label}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 p-4"
-                >
-                  <Ionicons name={card.icon} size={20} color={PRIMARY} />
-                  <View className="mt-3">
-                    <Text className="text-base font-bold text-white">
-                      {card.value}
-                    </Text>
-                    <Text className="mt-1 text-sm text-gray-400">
-                      {card.label}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            <View className="flex-row gap-4">
-              {SUMMARY_CARDS.slice(2, 4).map((card) => (
-                <View
-                  key={card.label}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 p-4"
-                >
-                  <Ionicons name={card.icon} size={20} color={PRIMARY} />
-                  <View className="mt-3">
-                    <Text className="text-base font-bold text-white">
-                      {card.value}
-                    </Text>
-                    <Text className="mt-1 text-sm text-gray-400">
-                      {card.label}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* ===== Week selector ===== */}
+          {/* Program header */}
           <View className="mb-4">
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingVertical: 4 }}
-            >
-              <View className="flex-row gap-2">
-                {WEEKS.map((week) => {
-                  const selected = week === activeWeek;
-                  return (
-                    <TouchableOpacity
-                      key={week}
-                      className={`h-10 items-center justify-center rounded-lg px-4 ${
-                        selected ? "bg-[#0df20d]" : "bg-white/10"
-                      }`}
-                    >
-                      <Text
-                        className={`text-sm font-medium ${
-                          selected ? "text-[#050816]" : "text-white"
-                        }`}
-                      >
-                        Week {week}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+            <View className="mb-2 flex-row items-center gap-2">
+              <View className="rounded-full bg-white/10 px-3 py-1">
+                <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                  {sourceLabel}
+                </Text>
               </View>
-            </ScrollView>
-          </View>
+              {program.coachName && (
+                <View className="rounded-full bg-white/10 px-3 py-1">
+                  <Text className="text-[11px] text-zinc-300">
+                    {program.coachName}
+                  </Text>
+                </View>
+              )}
+            </View>
 
-          {/* ===== Week overview title ===== */}
-          <View className="mb-3">
-            <Text className="text-base font-semibold text-white">
-              Week {activeWeek} Overview
+            <Text className="text-xl font-bold text-slate-50">
+              {program.name}
             </Text>
-            <Text className="mt-1 text-sm text-gray-400">
-              Tap a day to view or start the workout.
+            <Text className="mt-1 text-sm text-zinc-400">
+              {program.goal}
             </Text>
-          </View>
 
-          {/* ===== Day cards ===== */}
-          <View>
-            {DAYS.map((day) => {
-              let iconName: keyof typeof Ionicons.glyphMap = "ellipse-outline";
-              let iconBg = "bg-white/10";
-              let statusColor = "text-gray-400";
-
-              if (day.statusType === "completed") {
-                iconName = "checkmark-circle";
-                iconBg = "bg-[#0df20d]/20";
-                statusColor = "text-[#0df20d]";
-              } else if (day.statusType === "inProgress") {
-                iconName = "play-circle";
-                iconBg = "bg-[#0df20d]/20";
-                statusColor = "text-[#0df20d]";
-              }
-
-              return (
-                <TouchableOpacity
-                  key={day.id}
-                  className="mb-3 flex-row items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4"
-                  activeOpacity={0.85}
-                  onPress={() => handleDayPress(day.id)}
+            <View className="mt-3 flex-row flex-wrap gap-2">
+              {program.tags.map((tag) => (
+                <View
+                  key={tag}
+                  className="rounded-full bg-white/10 px-3 py-1"
                 >
-                  <View className={`flex size-12 items-center justify-center rounded-lg ${iconBg}`}>
-                    <Ionicons name={iconName} size={24} color={day.statusType === "notStarted" ? "#ffffff" : PRIMARY} />
-                  </View>
+                  <Text className="text-[11px] text-zinc-300">
+                    {tag}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
 
-                  <View className="flex-1 flex-col gap-1">
-                    <Text className="font-medium text-white">{day.title}</Text>
-                    <Text className="text-sm text-gray-400">
-                      {day.subtitle}
-                    </Text>
-                    <Text className={`text-sm font-medium ${statusColor}`}>
-                      {day.status}
-                    </Text>
-                  </View>
-
+          {/* Summary cards */}
+          <View className="mb-5 flex-row flex-wrap gap-3">
+            {summaryCards.map((card) => (
+              <View
+                key={card.label}
+                className="flex-1 min-w-[46%] rounded-2xl border border-white/10 bg-white/5 p-3"
+              >
+                <View className="mb-2 flex-row items-center gap-2">
                   <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color="#6b7280"
+                    name={card.icon}
+                    size={16}
+                    color="#9ca3af"
                   />
-                </TouchableOpacity>
-              );
-            })}
+                  <Text className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                    {card.label}
+                  </Text>
+                </View>
+                <Text className="text-sm font-semibold text-slate-50">
+                  {card.value}
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          {/* About */}
+          <View className="mb-5 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+              About this program
+            </Text>
+            <Text className="mt-2 text-sm leading-relaxed text-zinc-300">
+              {program.summary}
+            </Text>
+          </View>
+
+          {/* Weekly plan */}
+          <View className="mb-3 flex-row items-center justify-between">
+            <Text className="text-sm font-semibold text-slate-50">
+              Weekly structure
+            </Text>
+            <Text className="text-xs text-zinc-500">
+              {program.daysPerWeek} sessions / week
+            </Text>
+          </View>
+
+          <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-4">
+            {weeks.map(([weekNumber, days], index) => (
+              <View key={weekNumber}>
+                {index > 0 && (
+                  <View className="my-3 h-[1px] w-full bg-white/10" />
+                )}
+
+                <Text className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                  Week {weekNumber}
+                </Text>
+
+                {days
+                  .slice()
+                  .sort((a, b) => a.dayIndex - b.dayIndex)
+                  .map((day) => {
+                    let statusLabel = "";
+                    let statusColor = "";
+
+                    if (day.status === "today") {
+                      statusLabel = "Today";
+                      statusColor = "text-[#0df20d]";
+                    } else if (day.status === "completed") {
+                      statusLabel = "Done";
+                      statusColor = "text-emerald-300";
+                    } else {
+                      statusLabel = "Upcoming";
+                      statusColor = "text-zinc-400";
+                    }
+
+                    return (
+                      <TouchableOpacity
+                        key={day.id}
+                        className="mb-2 flex-row items-center justify-between rounded-2xl bg-black/40 px-3 py-3"
+                        activeOpacity={0.9}
+                        onPress={() => handleDayPress(day)}
+                      >
+                        <View className="flex-1 pr-2">
+                          <Text className="text-sm font-semibold text-slate-50">
+                            {day.title}
+                          </Text>
+                          <Text className="mt-1 text-xs text-zinc-400">
+                            {day.subtitle}
+                          </Text>
+                          <Text className="mt-1 text-[11px] text-zinc-500">
+                            {day.focus}
+                          </Text>
+                        </View>
+
+                        <View className="items-end">
+                          <Text
+                            className={`text-xs font-semibold ${statusColor}`}
+                          >
+                            {statusLabel}
+                          </Text>
+                          <Ionicons
+                            name="chevron-forward"
+                            size={18}
+                            color="#6b7280"
+                            style={{ marginTop: 6 }}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
+            ))}
           </View>
         </ScrollView>
+
+        {/* Sticky footer button */}
+        <View className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#050816] via-[#050816]/80 to-transparent px-4 pb-6 pt-4">
+          <TouchableOpacity
+            className="pointer-events-auto h-12 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
+            activeOpacity={0.9}
+            onPress={handleStartToday}
+          >
+            <Ionicons name="play" size={18} color="#050816" />
+            <Text className="ml-2 text-sm font-bold text-[#050816]">
+              Start today&apos;s workout
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );

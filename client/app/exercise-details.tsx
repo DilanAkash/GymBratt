@@ -1,70 +1,100 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-    Image,
-    ScrollView,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  MOCK_PROGRAMS,
+  type ProgramExercise,
+} from "../lib/mockPrograms";
 
 const PRIMARY = "#0df20d";
 
 type ExerciseDetailParams = {
   name?: string;
+  programId?: string;
+  dayId?: string;
+  exerciseId?: string;
 };
+
+function findExerciseFromProgram(
+  programId?: string,
+  exerciseId?: string
+): ProgramExercise | null {
+  if (!programId || !exerciseId) return null;
+
+  const program = MOCK_PROGRAMS.find((p) => p.id === programId);
+  if (!program) return null;
+
+  for (const day of program.days) {
+    const found = day.exercises.find((e) => e.id === exerciseId);
+    if (found) return found;
+  }
+
+  return null;
+}
 
 export default function ExerciseDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<ExerciseDetailParams>();
 
-  // Dynamic-ready template object – later we’ll load this from Firestore
-  const exercise = {
+  const fromProgram = findExerciseFromProgram(
+    params.programId,
+    params.exerciseId
+  );
+
+  const fallbackSets = [
+    {
+      id: "s1",
+      label: "Set 1",
+      targetReps: "8–10 reps",
+      rpe: "RPE 7–8",
+      rest: "Rest 90s",
+    },
+    {
+      id: "s2",
+      label: "Set 2",
+      targetReps: "8–10 reps",
+      rpe: "RPE 8",
+      rest: "Rest 90s",
+    },
+  ];
+
+  const exercise: ProgramExercise = fromProgram || {
+    id: "fallback",
     name: params.name || "Barbell Bench Press",
-    primaryMuscles: ["Chest"],
-    secondaryMuscles: ["Shoulders", "Triceps"],
-    equipment: ["Barbell", "Bench"],
-    difficulty: "Intermediate",
-    youtubeUrl: "https://youtube.com", // placeholder
-    // Content adapted from your HTML
-    steps: [
-      "Lie flat on your back on a bench. Grip the barbell with hands just wider than shoulder-width apart, so when you’re at the bottom of the move your hands are directly above your elbows.",
-      "Bring the bar slowly down to your chest, puffing it out to meet the bar. Keep your elbows at a 45-degree angle.",
-      "Push the bar back up to the starting position, squeezing your chest muscles. Don’t lock your elbows at the top.",
-      "Repeat for the desired number of repetitions.",
-    ],
-    mistakes: [
-      "Flaring elbows too wide: This puts unnecessary strain on your shoulder joints. Keep them tucked at about a 45-degree angle.",
-      "Lifting your hips off the bench: This can strain your lower back and reduces the effectiveness of the exercise for your chest.",
-      "Bouncing the bar off your chest: This uses momentum instead of muscle and increases the risk of injury. Control the weight throughout the entire movement.",
-    ],
-    // Just a placeholder preview image – later we’ll store per-exercise media
-    previewImage:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDSr0UJkUMGQ6T8YzLFq0f8Z99y2OCUc6lWuWZEHy_ob2DzlD-RsXC_AsrqUpbZZXy1R-olp5U1RUam2frItQ8bYIxn-tkV73uigYPmvyUnHM8KNtTmr2b2xOlb1MIbThEXxQdOl3ox1FFfjhUHQs1ifzLp11SoIyDbViQNvYwNx0n63rYAVOvpNLCuaYgxHSdlMXbJ5ZNxC8D9raj2GMMdNHxd11LpkVyNyucL23DulWPvHvfq0p4zK9SWIiDrXa_HYs8G3gEmEwA",
+    muscleGroup: "Chest",
+    equipment: "Barbell",
+    notes:
+      "Focus on a stable setup, controlled descent, and powerful press without losing tension.",
+    videoUrl: "",
+    sets: fallbackSets,
   };
+
+  const primaryMuscle = exercise.muscleGroup;
+  const equipment = exercise.equipment;
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
-      {/* Header – same spacing/theme as other screens */}
-      <View className="border-b border-white/10 bg-[#050816]/80 px-4 pb-3 pt-3">
+      {/* Header */}
+      <View className="border-b border-white/10 bg-[#050816]/80 px-4 pb-2 pt-3">
         <View className="flex-row items-center justify-between">
           <TouchableOpacity
-            className="h-10 w-10 items-center justify-center rounded-full bg-white/10"
+            className="h-9 w-9 items-center justify-center rounded-full bg-white/10"
             onPress={() => router.back()}
           >
             <Ionicons name="chevron-back" size={20} color="#ffffff" />
           </TouchableOpacity>
 
-          <Text
-            numberOfLines={1}
-            className="flex-1 px-2 text-center text-lg font-bold text-gray-100"
-          >
-            {exercise.name}
+          <Text className="flex-1 px-2 text-center text-base font-semibold text-slate-100">
+            Exercise details
           </Text>
 
-          {/* Spacer to keep title centered */}
-          <View className="h-10 w-10" />
+          <View className="h-9 w-9" />
         </View>
       </View>
 
@@ -74,134 +104,149 @@ export default function ExerciseDetailsScreen() {
           contentContainerStyle={{
             paddingHorizontal: 16,
             paddingTop: 16,
-            paddingBottom: 40,
+            paddingBottom: 32,
           }}
         >
-          {/* === Top media (4:3 preview) === */}
-          <View className="mb-6 w-full overflow-hidden rounded-xl">
-            <View
-              style={{ aspectRatio: 4 / 3 }}
-              className="w-full overflow-hidden rounded-xl bg-black/40"
-            >
-              <Image
-                source={{ uri: exercise.previewImage }}
-                resizeMode="cover"
-                className="h-full w-full"
+          {/* Title & tags */}
+          <View className="mb-4">
+            <Text className="text-xl font-bold text-slate-50">
+              {exercise.name}
+            </Text>
+            <View className="mt-2 flex-row flex-wrap gap-2">
+              <View className="rounded-full bg-white/10 px-3 py-1">
+                <Text className="text-[11px] text-zinc-300">
+                  {primaryMuscle}
+                </Text>
+              </View>
+              <View className="rounded-full bg-white/10 px-3 py-1">
+                <Text className="text-[11px] text-zinc-300">
+                  {equipment}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Hero / thumbnail placeholder */}
+          <View className="mb-5 h-40 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/0 to-emerald-500/20">
+            <View className="flex-1 items-center justify-center">
+              <Ionicons
+                name="barbell-outline"
+                size={40}
+                color="#e5e7eb"
               />
+              <Text className="mt-2 text-xs text-slate-200">
+                Video / demo preview (coming soon)
+              </Text>
             </View>
           </View>
 
-          {/* === Muscles / Equipment glass card === */}
-          <View className="mb-6 rounded-xl border border-white/10 bg-white/5 p-4">
-            {/* Primary */}
-            <View className="mb-4">
-              <Text className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
-                Primary Muscles
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {exercise.primaryMuscles.map((m) => (
-                  <View
-                    key={m}
-                    className="flex h-8 items-center justify-center rounded-lg bg-[#0df20d]/20 px-3"
-                  >
-                    <Text className="text-sm font-medium text-[#0df20d]">
-                      {m}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Secondary */}
-            <View className="mb-4">
-              <Text className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
-                Secondary Muscles
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {exercise.secondaryMuscles.map((m) => (
-                  <View
-                    key={m}
-                    className="flex h-8 items-center justify-center rounded-lg bg-[#0df20d]/20 px-3"
-                  >
-                    <Text className="text-sm font-medium text-[#0df20d]">
-                      {m}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-
-            {/* Equipment */}
-            <View>
-              <Text className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400">
-                Equipment
-              </Text>
-              <View className="flex-row flex-wrap gap-2">
-                {exercise.equipment.map((e) => (
-                  <View
-                    key={e}
-                    className="flex h-8 items-center justify-center rounded-lg bg-[#0df20d]/20 px-3"
-                  >
-                    <Text className="text-sm font-medium text-[#0df20d]">
-                      {e}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-
-          {/* === How to Perform card === */}
-          <View className="mb-6 rounded-xl border border-white/10 bg-white/5 p-4">
-            <Text className="text-xl font-bold text-gray-100">
-              How to Perform
+          {/* Technique card */}
+          <View className="mb-5 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+              Technique focus
             </Text>
-
-            <View className="mt-4">
-              {exercise.steps.map((step, idx) => (
-                <View key={idx} className="mb-3 flex-row gap-3">
-                  <View className="mt-0.5 h-6 w-6 items-center justify-center rounded-full bg-white/10">
-                    <Text className="text-xs font-bold text-gray-100">
-                      {idx + 1}
-                    </Text>
-                  </View>
-                  <Text className="flex-1 text-sm leading-relaxed text-gray-200">
-                    {step}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* === Common Mistakes card === */}
-          <View className="mb-6 rounded-xl border border-white/10 bg-white/5 p-4">
-            <Text className="text-xl font-bold text-gray-100">
-              Common Mistakes
+            <Text className="mt-2 text-sm leading-relaxed text-zinc-300">
+              {exercise.notes ||
+                "Focus on full range of motion, stable setup, and control on both concentric and eccentric portions of the lift."}
             </Text>
+          </View>
 
-            <View className="mt-4">
-              {exercise.mistakes.map((mistake, idx) => (
-                <View key={idx} className="mb-3 flex-row gap-2">
-                  <Text className="mt-[2px] text-base text-[#f97316]">•</Text>
-                  <Text className="flex-1 text-sm leading-relaxed text-gray-200">
-                    {mistake}
-                  </Text>
+          {/* Sets overview */}
+          <View className="mb-3 flex-row items-center justify-between">
+            <Text className="text-sm font-semibold text-slate-50">
+              Prescribed sets
+            </Text>
+            <Text className="text-xs text-zinc-500">
+              {exercise.sets.length} set
+              {exercise.sets.length !== 1 ? "s" : ""}
+            </Text>
+          </View>
+
+          <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-3">
+            {exercise.sets.map((set, index) => (
+              <View key={set.id}>
+                {index > 0 && (
+                  <View className="my-2 h-[1px] w-full bg-white/10" />
+                )}
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center gap-3">
+                    <View className="h-8 w-8 items-center justify-center rounded-full bg-black/60">
+                      <Text className="text-xs font-semibold text-slate-50">
+                        {index + 1}
+                      </Text>
+                    </View>
+                    <View>
+                      <Text className="text-sm font-medium text-slate-50">
+                        {set.targetReps}
+                      </Text>
+                      <View className="mt-0.5 flex-row flex-wrap gap-2">
+                        {set.rpe && (
+                          <Text className="text-[11px] text-zinc-400">
+                            {set.rpe}
+                          </Text>
+                        )}
+                        {set.rest && (
+                          <Text className="text-[11px] text-zinc-500">
+                            {set.rest}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
                 </View>
-              ))}
+              </View>
+            ))}
+          </View>
+
+          {/* Coaching cues */}
+          <View className="mb-5 rounded-3xl border border-white/10 bg-white/5 p-4">
+            <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+              Coaching cues
+            </Text>
+            <View className="mt-2 space-y-2">
+              <View className="flex-row gap-2">
+                <Text className="mt-[2px] text-base text-[#0df20d]">
+                  •
+                </Text>
+                <Text className="flex-1 text-sm text-zinc-300">
+                  Control the lowering phase; don&apos;t let the weight
+                  drop.
+                </Text>
+              </View>
+              <View className="flex-row gap-2">
+                <Text className="mt-[2px] text-base text-[#0df20d]">
+                  •
+                </Text>
+                <Text className="flex-1 text-sm text-zinc-300">
+                  Keep your setup consistent on every rep and every set.
+                </Text>
+              </View>
+              <View className="flex-row gap-2">
+                <Text className="mt-[2px] text-base text-[#0df20d]">
+                  •
+                </Text>
+                <Text className="flex-1 text-sm text-zinc-300">
+                  Stop 1–2 reps before failure unless otherwise noted.
+                </Text>
+              </View>
             </View>
           </View>
 
-          {/* === YouTube button === */}
+          {/* Video button */}
           <TouchableOpacity
-            className="mb-4 flex h-12 flex-row items-center justify-center gap-2 rounded-xl bg-[#0df20d] px-4"
+            className="mb-4 h-11 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)]"
             activeOpacity={0.9}
             onPress={() => {
-              // Later: Linking.openURL(exercise.youtubeUrl);
+              // Later: open exercise.videoUrl when available
             }}
           >
-            <Ionicons name="play-circle" size={20} color="#050816" />
-            <Text className="text-sm font-bold text-[#050816]">
-              View on YouTube
+            <Ionicons
+              name="play-circle"
+              size={20}
+              color="#050816"
+            />
+            <Text className="ml-2 text-sm font-bold text-[#050816]">
+              View demo video
             </Text>
           </TouchableOpacity>
         </ScrollView>
