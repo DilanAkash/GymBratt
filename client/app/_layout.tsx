@@ -35,6 +35,7 @@ export default function RootLayout() {
         <Stack.Screen name="payments" />
         <Stack.Screen name="requests-messages" />
         <Stack.Screen name="modal" />
+        <Stack.Screen name="scan-qr" />
       </Stack>
     </UserProvider>
   );

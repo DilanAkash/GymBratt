@@ -268,12 +268,11 @@ export default function HomeScreen() {
 
             <TouchableOpacity
               className="mt-4 h-11 items-center justify-center rounded-full bg-white/10"
-              onPress={() => {
-                // Later: open QR modal
-              }}
+              activeOpacity={0.9}
+              onPress={() => router.push("/scan-qr")}
             >
-              <Text className="text-[13px] font-medium text-slate-50">
-                Show QR Code
+              <Text className="text-xs font-semibold text-slate-100">
+                Scan check-in QR
               </Text>
             </TouchableOpacity>
           </View>
