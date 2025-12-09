@@ -27,7 +27,6 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    // basic validation
     const trimmedEmail = email.trim();
 
     if (!trimmedEmail || !password) {
@@ -39,11 +38,11 @@ export default function LoginScreen() {
       setLoading(true);
       setErrorMessage(null);
 
-      // 🔐 Real Firebase login
+      // ✅ Real Firebase Auth login, but NO Firestore calls here
       await signInWithEmailAndPassword(auth, trimmedEmail, password);
 
-      // On success → go to main app
-      router.replace("/(tabs)");
+      // After login: go straight to Edit Profile (first-time setup style)
+      router.replace("/edit-profile");
     } catch (err: any) {
       console.log("Login error:", err);
 
