@@ -9,12 +9,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  MOCK_PROGRAMS,
   type Program,
   type ProgramDay,
   type ProgramExercise,
   type ProgramSetSchema,
 } from "../lib/mockPrograms";
+import { useProgramStore } from "../lib/ProgramStoreContext";
 
 type WorkoutDayParams = {
   programId?: string;
@@ -28,21 +28,6 @@ type UpNextInfo = {
   setLabel: string;
   targetReps: string;
 };
-
-function findProgramAndDay(
-  programId?: string,
-  dayId?: string
-): { program: Program; day: ProgramDay } {
-  const program =
-    (programId && MOCK_PROGRAMS.find((p) => p.id === programId)) ||
-    MOCK_PROGRAMS[0];
-
-  const day =
-    (dayId && program.days.find((d) => d.id === dayId)) ||
-    program.days[0];
-
-  return { program, day };
-}
 
 function parseRestStringToSeconds(rest?: string): number | null {
   if (!rest) return null;
@@ -71,11 +56,29 @@ function formatSeconds(total: number): string {
   return `0:${s.toString().padStart(2, "0")}`;
 }
 
+function findProgramAndDay(
+  programs: Program[],
+  programId?: string,
+  dayId?: string
+): { program: Program; day: ProgramDay } {
+  const program =
+    (programId && programs.find((p) => p.id === programId)) ||
+    programs[0];
+
+  const day =
+    (dayId && program.days.find((d) => d.id === dayId)) ||
+    program.days[0];
+
+  return { program, day };
+}
+
 export default function WorkoutDayScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<WorkoutDayParams>();
+  const { programs } = useProgramStore();
 
   const { program, day } = findProgramAndDay(
+    programs,
     params.programId,
     params.dayId
   );
@@ -91,7 +94,12 @@ export default function WorkoutDayScreen() {
   const [restTotal, setRestTotal] = useState(0);
   const [upNext, setUpNext] = useState<UpNextInfo | null>(null);
 
-  // Flatten all sets so we can figure out "up next" easily
+  // 🔆 Highlight next set when rest is over
+  const [highlightedKey, setHighlightedKey] = useState<string | null>(
+    null
+  );
+
+  // Flatten all sets so we can easily track “next”
   const allSets = useMemo(
     () =>
       day.exercises.flatMap((ex) =>
@@ -122,6 +130,7 @@ export default function WorkoutDayScreen() {
         if (next <= 0) {
           // Rest finished
           setIsResting(false);
+          // keep highlightedKey as “ready” set
           return 0;
         }
         return next;
@@ -157,16 +166,18 @@ export default function WorkoutDayScreen() {
     if (next) {
       setUpNext({
         exerciseName: next.exercise.name,
-        setLabel:
-          next.set.label || `Set ${next.index + 1}`,
+        setLabel: next.set.label || `Set ${next.index + 1}`,
         targetReps: next.set.targetReps,
       });
+      // 🔆 highlight that next set
+      setHighlightedKey(next.key);
     } else {
       setUpNext({
         exerciseName: exercise.name,
         setLabel: "Session almost done",
         targetReps: "No more sets after this",
       });
+      setHighlightedKey(null);
     }
   };
 
@@ -176,6 +187,7 @@ export default function WorkoutDayScreen() {
     setRestTotal(0);
     setActiveRestKey(null);
     setUpNext(null);
+    // keep highlightedKey so next set remains visually “ready”
   };
 
   const markAllCompleted = () => {
@@ -185,6 +197,7 @@ export default function WorkoutDayScreen() {
     }
     setCompletedSets(next);
     clearRest();
+    setHighlightedKey(null);
   };
 
   const handleExercisePress = (exercise: ProgramExercise) => {
@@ -219,6 +232,8 @@ export default function WorkoutDayScreen() {
         if (activeRestKey === key) {
           clearRest();
         }
+        // If we uncheck a set, any highlight for next set no longer applies
+        setHighlightedKey(null);
       }
 
       return updated;
@@ -229,6 +244,9 @@ export default function WorkoutDayScreen() {
     !isResting || restTotal <= 0
       ? 0
       : (restTotal - restRemaining) / restTotal;
+
+  const showCompleteButton =
+    totalSets > 0 && completedCount === totalSets;
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -307,7 +325,7 @@ export default function WorkoutDayScreen() {
                 </View>
 
                 <TouchableOpacity
-                  className="h-8 rounded-full bg-white/10 px-3 items-center justify-center"
+                  className="h-8 items-center justify-center rounded-full bg-white/10 px-3"
                   activeOpacity={0.85}
                   onPress={clearRest}
                 >
@@ -382,11 +400,16 @@ export default function WorkoutDayScreen() {
                 {exercise.sets.map((set, index) => {
                   const key = `${exercise.id}-${set.id}-${index}`;
                   const isDone = !!completedSets[key];
+                  const isHighlighted = key === highlightedKey;
 
                   return (
                     <View
                       key={set.id}
-                      className="mb-2 flex-row items-center justify-between"
+                      className={`mb-2 flex-row items-center justify-between ${
+                        isHighlighted
+                          ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10 px-2 py-1"
+                          : ""
+                      }`}
                     >
                       <View className="flex-row items-center gap-3">
                         <Text className="text-xs font-semibold text-zinc-500">
@@ -408,6 +431,11 @@ export default function WorkoutDayScreen() {
                               </Text>
                             )}
                           </View>
+                          {isHighlighted && (
+                            <Text className="mt-0.5 text-[10px] font-semibold text-[#0df20d]">
+                              Ready – this is your next set
+                            </Text>
+                          )}
                         </View>
                       </View>
 
@@ -438,23 +466,25 @@ export default function WorkoutDayScreen() {
           ))}
         </ScrollView>
 
-        {/* Sticky footer button */}
-        <View className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#050816] via-[#050816]/80 to-transparent px-4 pb-6 pt-4">
-          <TouchableOpacity
-            className="pointer-events-auto h-12 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
-            activeOpacity={0.9}
-            onPress={markAllCompleted}
-          >
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={18}
-              color="#050816"
-            />
-            <Text className="ml-2 text-sm font-bold text-[#050816]">
-              Mark workout completed
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {/* Sticky footer button – only when ALL sets are done */}
+        {showCompleteButton && (
+          <View className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#050816] via-[#050816]/80 to-transparent px-4 pb-6 pt-4">
+            <TouchableOpacity
+              className="pointer-events-auto h-12 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
+              activeOpacity={0.9}
+              onPress={markAllCompleted}
+            >
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={18}
+                color="#050816"
+              />
+              <Text className="ml-2 text-sm font-bold text-[#050816]">
+                Mark workout completed
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );

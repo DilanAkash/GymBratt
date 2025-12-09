@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MOCK_PROGRAMS, type Program } from "../../lib/mockPrograms";
+import { type Program } from "../../lib/mockPrograms";
+import { useProgramStore } from "../../lib/ProgramStoreContext";
 
 const PRIMARY = "#0df20d";
 
@@ -93,13 +94,10 @@ function ProgramCard({
 
 export default function WorkoutsScreen() {
   const router = useRouter();
+  const { programs } = useProgramStore();
 
-  const coachPrograms = MOCK_PROGRAMS.filter(
-    (p) => p.source === "coach"
-  );
-  const myPrograms = MOCK_PROGRAMS.filter(
-    (p) => p.source === "user"
-  );
+  const coachPrograms = programs.filter((p) => p.source === "coach");
+  const myPrograms = programs.filter((p) => p.source === "user");
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">

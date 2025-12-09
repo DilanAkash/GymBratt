@@ -3,24 +3,16 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  MOCK_PROGRAMS,
   type Program,
   type ProgramDay,
 } from "../lib/mockPrograms";
+import { useProgramStore } from "../lib/ProgramStoreContext";
 
 const PRIMARY = "#0df20d";
 
 type ProgramDetailsParams = {
   programId?: string;
 };
-
-function findProgram(programId?: string): Program {
-  if (programId) {
-    const fromId = MOCK_PROGRAMS.find((p) => p.id === programId);
-    if (fromId) return fromId;
-  }
-  return MOCK_PROGRAMS[0];
-}
 
 function groupDaysByWeek(program: Program): [number, ProgramDay[]][] {
   const map = new Map<number, ProgramDay[]>();
@@ -35,8 +27,13 @@ function groupDaysByWeek(program: Program): [number, ProgramDay[]][] {
 export default function ProgramDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<ProgramDetailsParams>();
+  const { programs } = useProgramStore();
 
-  const program = findProgram(params.programId);
+  const program =
+    (params.programId &&
+      programs.find((p) => p.id === params.programId)) ||
+    programs[0];
+
   const weeks = groupDaysByWeek(program);
 
   const completion =
