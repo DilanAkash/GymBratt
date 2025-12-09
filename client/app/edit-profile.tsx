@@ -9,27 +9,42 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAppUser } from "../lib/UserContext";
 
 const PRIMARY = "#0df20d";
 
 export default function EditProfileScreen() {
   const router = useRouter();
+  const { user, setUser } = useAppUser();
 
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [fullName, setFullName] = useState(user.fullName || "");
+  const [email, setEmail] = useState(user.email || "");
   const [phone, setPhone] = useState("");
   const [dob, setDob] = useState("");
   const [goal, setGoal] = useState("");
 
   const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
-    // Template mode: pretend to save, then go to tabs
+  const handleSave = () => {
     setSaving(true);
+
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim();
+
+    // Update global user context (for this session)
+    setUser({
+      fullName: trimmedName || "Athlete",
+      email: trimmedEmail || "member@example.com",
+      gymName: user.gymName || "Your Gym",
+      membershipStatus: user.membershipStatus || "Active",
+      membershipLevel: user.membershipLevel || "Standard · 3 days / week",
+    });
+
+    // Small delay to make button feedback feel real
     setTimeout(() => {
       setSaving(false);
       router.replace("/(tabs)");
-    }, 600); // small delay just to feel responsive
+    }, 500);
   };
 
   return (
@@ -64,7 +79,7 @@ export default function EditProfileScreen() {
         <View className="mb-6 items-center">
           <View className="h-20 w-20 items-center justify-center rounded-full border-2 border-[rgba(13,242,13,0.7)] bg-black/80">
             <Text className="text-2xl font-bold text-white">
-              {fullName ? fullName.charAt(0).toUpperCase() : "?"}
+              {(fullName || user.fullName || "A").charAt(0).toUpperCase()}
             </Text>
           </View>
           <TouchableOpacity className="mt-3 flex-row items-center gap-1.5">
@@ -155,7 +170,7 @@ export default function EditProfileScreen() {
             Gym
           </Text>
           <Text className="text-sm font-semibold text-slate-100">
-            Not linked yet
+            {user.gymName || "Not linked yet"}
           </Text>
           <Text className="mt-1 text-xs text-slate-400">
             Your gym will appear here when an admin links your membership.

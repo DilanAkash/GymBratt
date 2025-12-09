@@ -2,35 +2,29 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { db } from "../../lib/firebase";
+import { useAppUser } from "../../lib/UserContext";
 
 const PRIMARY = "#0df20d";
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { user } = useAppUser();
 
-  // temporary no-op usage to confirm firebase compiles
-  // (we'll replace this with real queries later)
-  console.log("Firestore instance:", db);
-
-  // 🔹 Dynamic-ready objects (later these come from Firebase)
-  const user = {
-    name: "Dilan",
-    gymName: "Fitness First Gym",
-  };
+  const displayName = user.fullName || "Athlete";
+  const gymName = user.gymName || "Your Gym";
 
   const membership = {
-    status: "Active",
+    status: user.membershipStatus || "Active",
     statusColor: PRIMARY,
-    memberName: "Dilan Akash",
-    memberId: "FF-2049",
-    expiresAt: "2025-12-31",
+    memberName: displayName,
+    memberId: "FF-2049", // placeholder
+    expiresAt: "2025-12-31", // placeholder
   };
 
   const todayWorkout = {
     title: "Push Day – Hypertrophy",
     durationMinutes: 60,
-    progress: 0.25, // 25% – later from logs
+    progress: 0.25, // later from logs
     statusText: "Scheduled",
   };
 
@@ -74,9 +68,9 @@ export default function HomeScreen() {
             <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
               Welcome back
             </Text>
-            <Text className="mt-2 text-2xl font-bold text-slate-50">
-              Good morning, {user.name} 👋
-            </Text>
+              <Text className="mt-2 text-2xl font-bold text-slate-50">
+                Good morning, {displayName} 👋
+              </Text>
             <Text className="mt-1 text-sm text-zinc-400">
               Here&apos;s your plan for today.
             </Text>
@@ -84,9 +78,9 @@ export default function HomeScreen() {
 
           {/* Avatar with ring (simple version – later we can use gradients) */}
           <View className="h-14 w-14 items-center justify-center rounded-full border-2 border-[rgba(13,242,13,0.7)] bg-black/60">
-            <Text className="text-lg font-semibold text-white">
-              {user.name.charAt(0)}
-            </Text>
+          <Text className="mt-1 text-base font-semibold text-slate-50">
+            {gymName}
+          </Text>
           </View>
         </View>
 
