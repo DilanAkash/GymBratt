@@ -3,23 +3,36 @@ import "../global.css";
 
 export default function RootLayout() {
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="workout-day" options={{ headerShown: false }} />
-      <Stack.Screen name="new-program" options={{ headerShown: false }} />
-      <Stack.Screen name="new-program-builder" options={{ headerShown: false }} />
-      <Stack.Screen name="program-details" options={{ headerShown: false }} />
-      <Stack.Screen name="exercise-details" options={{ headerShown: false }} />
-      <Stack.Screen name="meal-details" options={{ headerShown: false }} />
-      <Stack.Screen name="add-progress-entry" options={{ headerShown: false }} />
-      <Stack.Screen name="progress-photos" options={{ headerShown: false }} />
-      <Stack.Screen name="settings" options={{ headerShown: false }} />
-      <Stack.Screen name="edit-profile" options={{ headerShown: false }} />
-      <Stack.Screen name="membership-details" options={{ headerShown: false }} />
-      <Stack.Screen name="attendance" options={{ headerShown: false }} />
-      <Stack.Screen name="payments" options={{ headerShown: false }} />
-      <Stack.Screen name="requests-messages" options={{ headerShown: false }} />
-      <Stack.Screen name="modal" options={{ presentation: "modal" }} />
+    <Stack
+      screenOptions={{
+        headerShown: false,   // ⬅️ FORCE no headers anywhere
+      }}
+      initialRouteName="welcome"
+    >
+      {/* Auth / Entry flow */}
+      <Stack.Screen name="splash" />
+      <Stack.Screen name="welcome" />
+      <Stack.Screen name="login" />
+      <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="request-membership" />
+
+      {/* Main app */}
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="workout-day" />
+      <Stack.Screen name="new-program" />
+      <Stack.Screen name="new-program-builder" />
+      <Stack.Screen name="program-details" />
+      <Stack.Screen name="exercise-details" />
+      <Stack.Screen name="meal-details" />
+      <Stack.Screen name="add-progress-entry" />
+      <Stack.Screen name="progress-photos" />
+      <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="settings" />
+      <Stack.Screen name="membership-details" />
+      <Stack.Screen name="attendance" />
+      <Stack.Screen name="payments" />
+      <Stack.Screen name="requests-messages" />
+      <Stack.Screen name="modal" />
     </Stack>
   );
 }

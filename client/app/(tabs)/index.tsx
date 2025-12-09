@@ -2,11 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { db } from "../../lib/firebase";
 
 const PRIMARY = "#0df20d";
 
 export default function HomeScreen() {
   const router = useRouter();
+
+  // temporary no-op usage to confirm firebase compiles
+  // (we'll replace this with real queries later)
+  console.log("Firestore instance:", db);
 
   // 🔹 Dynamic-ready objects (later these come from Firebase)
   const user = {
