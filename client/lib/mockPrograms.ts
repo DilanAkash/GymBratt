@@ -10,7 +10,14 @@ export interface ProgramSetSchema {
   targetReps: string; // e.g. "8–10 reps"
   rpe?: string; // e.g. "RPE 8"
   rest?: string; // e.g. "Rest 90s"
+  /**
+   * Optional numeric rest for timers (seconds).
+   * If not provided, we’ll try to parse it from `rest` string,
+   * and if that fails we’ll default to 60s.
+   */
+  restSeconds?: number;
 }
+
 
 export interface ProgramExercise {
   id: string;

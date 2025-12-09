@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ScrollView,
   Text,
@@ -13,6 +13,7 @@ import {
   type Program,
   type ProgramDay,
   type ProgramExercise,
+  type ProgramSetSchema,
 } from "../lib/mockPrograms";
 
 type WorkoutDayParams = {
@@ -21,6 +22,12 @@ type WorkoutDayParams = {
 };
 
 type CompletedMap = Record<string, boolean>;
+
+type UpNextInfo = {
+  exerciseName: string;
+  setLabel: string;
+  targetReps: string;
+};
 
 function findProgramAndDay(
   programId?: string,
@@ -37,6 +44,33 @@ function findProgramAndDay(
   return { program, day };
 }
 
+function parseRestStringToSeconds(rest?: string): number | null {
+  if (!rest) return null;
+  const match = rest.match(
+    /(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes)?/i
+  );
+  if (!match) return null;
+
+  const value = parseInt(match[1], 10);
+  const unit = (match[2] || "s").toLowerCase();
+
+  if (unit.startsWith("m")) {
+    // minutes
+    return value * 60;
+  }
+  // seconds by default
+  return value;
+}
+
+function formatSeconds(total: number): string {
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m > 0) {
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+  return `0:${s.toString().padStart(2, "0")}`;
+}
+
 export default function WorkoutDayScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<WorkoutDayParams>();
@@ -48,13 +82,27 @@ export default function WorkoutDayScreen() {
 
   const [completedSets, setCompletedSets] = useState<CompletedMap>({});
 
-  const allSets = day.exercises.flatMap((ex) =>
-    ex.sets.map((set, index) => ({
-      key: `${ex.id}-${set.id}-${index}`,
-      exercise: ex,
-      set,
-      index,
-    }))
+  // 🔥 Rest timer state
+  const [activeRestKey, setActiveRestKey] = useState<string | null>(
+    null
+  );
+  const [isResting, setIsResting] = useState(false);
+  const [restRemaining, setRestRemaining] = useState(0);
+  const [restTotal, setRestTotal] = useState(0);
+  const [upNext, setUpNext] = useState<UpNextInfo | null>(null);
+
+  // Flatten all sets so we can figure out "up next" easily
+  const allSets = useMemo(
+    () =>
+      day.exercises.flatMap((ex) =>
+        ex.sets.map((set, index) => ({
+          key: `${ex.id}-${set.id}-${index}`,
+          exercise: ex,
+          set,
+          index,
+        }))
+      ),
+    [day]
   );
 
   const totalSets = allSets.length;
@@ -64,11 +112,70 @@ export default function WorkoutDayScreen() {
   const progress =
     totalSets > 0 ? completedCount / totalSets : 0;
 
-  const toggleSet = (key: string) => {
-    setCompletedSets((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  // ⏱ Timer effect – counts down once per second when resting
+  useEffect(() => {
+    if (!isResting || restRemaining <= 0) return;
+
+    const id = setInterval(() => {
+      setRestRemaining((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          // Rest finished
+          setIsResting(false);
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [isResting, restRemaining]);
+
+  const startRest = (
+    key: string,
+    exercise: ProgramExercise,
+    set: ProgramSetSchema,
+    index: number
+  ) => {
+    // Prefer numeric restSeconds if available; otherwise parse string
+    const fromNumeric = set.restSeconds;
+    const parsed = parseRestStringToSeconds(set.rest);
+    const seconds =
+      (typeof fromNumeric === "number" && fromNumeric > 0
+        ? fromNumeric
+        : parsed) ?? 60;
+
+    setActiveRestKey(key);
+    setIsResting(true);
+    setRestRemaining(seconds);
+    setRestTotal(seconds);
+
+    // Figure out the "up next" set
+    const flatIndex = allSets.findIndex((s) => s.key === key);
+    const next = allSets[flatIndex + 1];
+
+    if (next) {
+      setUpNext({
+        exerciseName: next.exercise.name,
+        setLabel:
+          next.set.label || `Set ${next.index + 1}`,
+        targetReps: next.set.targetReps,
+      });
+    } else {
+      setUpNext({
+        exerciseName: exercise.name,
+        setLabel: "Session almost done",
+        targetReps: "No more sets after this",
+      });
+    }
+  };
+
+  const clearRest = () => {
+    setIsResting(false);
+    setRestRemaining(0);
+    setRestTotal(0);
+    setActiveRestKey(null);
+    setUpNext(null);
   };
 
   const markAllCompleted = () => {
@@ -77,6 +184,7 @@ export default function WorkoutDayScreen() {
       next[s.key] = true;
     }
     setCompletedSets(next);
+    clearRest();
   };
 
   const handleExercisePress = (exercise: ProgramExercise) => {
@@ -89,6 +197,38 @@ export default function WorkoutDayScreen() {
       },
     });
   };
+
+  const handleSetPress = (
+    key: string,
+    exercise: ProgramExercise,
+    set: ProgramSetSchema,
+    index: number
+  ) => {
+    setCompletedSets((prev) => {
+      const nextCompleted = !prev[key];
+      const updated: CompletedMap = {
+        ...prev,
+        [key]: nextCompleted,
+      };
+
+      // When we mark a set as done → start rest
+      if (nextCompleted) {
+        startRest(key, exercise, set, index);
+      } else {
+        // If we uncheck the set that is currently resting → stop rest
+        if (activeRestKey === key) {
+          clearRest();
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  const restProgress =
+    !isResting || restTotal <= 0
+      ? 0
+      : (restTotal - restRemaining) / restTotal;
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -150,13 +290,65 @@ export default function WorkoutDayScreen() {
             </View>
           </View>
 
+          {/* Rest timer card (only visible while resting) */}
+          {isResting && restTotal > 0 && (
+            <View className="mb-5 rounded-3xl border border-emerald-500/40 bg-emerald-500/10 p-4">
+              <View className="mb-2 flex-row items-center justify-between">
+                <View>
+                  <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                    Rest timer
+                  </Text>
+                  <Text className="mt-1 text-2xl font-bold text-emerald-100">
+                    {formatSeconds(restRemaining)}
+                  </Text>
+                  <Text className="mt-1 text-[11px] text-emerald-100/80">
+                    Stay loose, breathe, get ready for the next set.
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  className="h-8 rounded-full bg-white/10 px-3 items-center justify-center"
+                  activeOpacity={0.85}
+                  onPress={clearRest}
+                >
+                  <Text className="text-[11px] font-semibold text-emerald-100">
+                    Skip rest
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Rest progress bar */}
+              <View className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-emerald-500/20">
+                <View
+                  className="h-1.5 rounded-full bg-emerald-400"
+                  style={{ width: `${restProgress * 100}%` }}
+                />
+              </View>
+
+              {upNext && (
+                <View className="mt-3">
+                  <Text className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200/90">
+                    Up next
+                  </Text>
+                  <Text className="mt-1 text-sm font-semibold text-emerald-50">
+                    {upNext.exerciseName}
+                  </Text>
+                  <Text className="text-xs text-emerald-100/80">
+                    {upNext.setLabel} · {upNext.targetReps}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Exercises list */}
           <View className="mb-3">
             <Text className="text-sm font-semibold text-slate-50">
               Exercises
             </Text>
             <Text className="mt-1 text-xs text-zinc-500">
-              Tap an exercise to view technique details.
+              Tap an exercise to view technique details. Mark each set
+              done to trigger your rest timer.
             </Text>
           </View>
 
@@ -220,13 +412,15 @@ export default function WorkoutDayScreen() {
                       </View>
 
                       <TouchableOpacity
-                        className={`h-7 min-w-[72px] items-center justify-center rounded-full border ${
+                        className={`h-7 min-w-[88px] items-center justify-center rounded-full border ${
                           isDone
                             ? "border-[#0df20d] bg-[#0df20d]"
                             : "border-white/30 bg-transparent"
                         }`}
                         activeOpacity={0.85}
-                        onPress={() => toggleSet(key)}
+                        onPress={() =>
+                          handleSetPress(key, exercise, set, index)
+                        }
                       >
                         <Text
                           className={`text-[11px] font-semibold ${
