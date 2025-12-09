@@ -7,9 +7,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAttendance } from "../lib/AttendanceContext";
 
 export default function ScanQrScreen() {
   const router = useRouter();
+  const { addCheckIn } = useAttendance();
 
   const [scanned, setScanned] = useState(false);
   const [checkInInfo, setCheckInInfo] = useState<{
@@ -19,11 +21,14 @@ export default function ScanQrScreen() {
 
   const handleFakeScan = () => {
     // 🧪 Template mode: pretend we scanned a real QR
+    const gymId = "apex-gym-01";
+    const gymName = "Apex Gym";
+
+    // Save attendance entry to global state
+    addCheckIn({ gymId });
+
     setScanned(true);
-    setCheckInInfo({
-      gymId: "apex-gym-01",
-      gymName: "Apex Gym",
-    });
+    setCheckInInfo({ gymId, gymName });
   };
 
   const handleReset = () => {
