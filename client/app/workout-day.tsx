@@ -388,7 +388,7 @@ export default function WorkoutDayScreen() {
     try {
       setIsCompleting(true);
       clearRest();
-      setWorkoutStatus("completed");      
+      setWorkoutStatus("completed");
 
       // Vibrate a bit on completion
       await Haptics.notificationAsync(
@@ -414,7 +414,8 @@ export default function WorkoutDayScreen() {
       );      
       setIsCompleting(false);
     } finally {
-      stopRestNotifications();      
+      setIsCompleting(false);
+      stopRestNotifications();
     }
   };
 
@@ -627,7 +628,7 @@ export default function WorkoutDayScreen() {
           {day.exercises.map((exercise) => (
             <View
               key={exercise.id}
-              className="mb-4 rounded-3xl border border.white/10 bg-white/5 p-4"
+              className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4"
             >
               <TouchableOpacity
                 activeOpacity={0.85}
@@ -664,7 +665,7 @@ export default function WorkoutDayScreen() {
 
                   return (
                     <View
-                      key={set.id}
+                      key={key}
                       className={`mb-2 flex-row items-center justify-between ${
                         isNextHighlight
                           ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10"
