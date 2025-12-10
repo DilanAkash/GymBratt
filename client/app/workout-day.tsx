@@ -29,33 +29,6 @@ type UpNextInfo = {
   targetReps: string;
 };
 
-function parseRestStringToSeconds(rest?: string): number | null {
-  if (!rest) return null;
-  const match = rest.match(
-    /(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes)?/i
-  );
-  if (!match) return null;
-
-  const value = parseInt(match[1], 10);
-  const unit = (match[2] || "s").toLowerCase();
-
-  if (unit.startsWith("m")) {
-    // minutes
-    return value * 60;
-  }
-  // seconds by default
-  return value;
-}
-
-function formatSeconds(total: number): string {
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  if (m > 0) {
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  }
-  return `0:${s.toString().padStart(2, "0")}`;
-}
-
 function findProgramAndDay(
   programs: Program[],
   programId?: string,
@@ -72,10 +45,35 @@ function findProgramAndDay(
   return { program, day };
 }
 
+function parseRestStringToSeconds(rest?: string): number | null {
+  if (!rest) return null;
+  const match = rest.match(
+    /(\d+)\s*(s|sec|secs|second|seconds|m|min|mins|minute|minutes)?/i
+  );
+  if (!match) return null;
+
+  const value = parseInt(match[1], 10);
+  const unit = (match[2] || "s").toLowerCase();
+
+  if (unit.startsWith("m")) {
+    return value * 60;
+  }
+  return value;
+}
+
+function formatSeconds(total: number): string {
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m > 0) {
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+  return `0:${s.toString().padStart(2, "0")}`;
+}
+
 export default function WorkoutDayScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<WorkoutDayParams>();
-  const { programs } = useProgramStore();
+  const { programs, completeWorkoutDay } = useProgramStore();
 
   const { program, day } = findProgramAndDay(
     programs,
@@ -93,13 +91,9 @@ export default function WorkoutDayScreen() {
   const [restRemaining, setRestRemaining] = useState(0);
   const [restTotal, setRestTotal] = useState(0);
   const [upNext, setUpNext] = useState<UpNextInfo | null>(null);
+  const [nextSetKey, setNextSetKey] = useState<string | null>(null);
 
-  // 🔆 Highlight next set when rest is over
-  const [highlightedKey, setHighlightedKey] = useState<string | null>(
-    null
-  );
-
-  // Flatten all sets so we can easily track “next”
+  // Flatten all sets so we can figure out "up next" easily
   const allSets = useMemo(
     () =>
       day.exercises.flatMap((ex) =>
@@ -120,6 +114,8 @@ export default function WorkoutDayScreen() {
   const progress =
     totalSets > 0 ? completedCount / totalSets : 0;
 
+  const allCompleted = totalSets > 0 && completedCount === totalSets;
+
   // ⏱ Timer effect – counts down once per second when resting
   useEffect(() => {
     if (!isResting || restRemaining <= 0) return;
@@ -128,9 +124,8 @@ export default function WorkoutDayScreen() {
       setRestRemaining((prev) => {
         const next = prev - 1;
         if (next <= 0) {
-          // Rest finished
+          // Rest finished → stop timer, keep nextSetKey
           setIsResting(false);
-          // keep highlightedKey as “ready” set
           return 0;
         }
         return next;
@@ -169,15 +164,14 @@ export default function WorkoutDayScreen() {
         setLabel: next.set.label || `Set ${next.index + 1}`,
         targetReps: next.set.targetReps,
       });
-      // 🔆 highlight that next set
-      setHighlightedKey(next.key);
+      setNextSetKey(next.key);
     } else {
       setUpNext({
         exerciseName: exercise.name,
         setLabel: "Session almost done",
         targetReps: "No more sets after this",
       });
-      setHighlightedKey(null);
+      setNextSetKey(null);
     }
   };
 
@@ -187,7 +181,7 @@ export default function WorkoutDayScreen() {
     setRestTotal(0);
     setActiveRestKey(null);
     setUpNext(null);
-    // keep highlightedKey so next set remains visually “ready”
+    setNextSetKey(null);
   };
 
   const markAllCompleted = () => {
@@ -197,7 +191,13 @@ export default function WorkoutDayScreen() {
     }
     setCompletedSets(next);
     clearRest();
-    setHighlightedKey(null);
+
+    // 🔥 Update store + go back to program details
+    completeWorkoutDay(program.id, day.id);
+    router.replace({
+      pathname: "/program-details",
+      params: { programId: program.id },
+    });
   };
 
   const handleExercisePress = (exercise: ProgramExercise) => {
@@ -232,8 +232,6 @@ export default function WorkoutDayScreen() {
         if (activeRestKey === key) {
           clearRest();
         }
-        // If we uncheck a set, any highlight for next set no longer applies
-        setHighlightedKey(null);
       }
 
       return updated;
@@ -244,9 +242,6 @@ export default function WorkoutDayScreen() {
     !isResting || restTotal <= 0
       ? 0
       : (restTotal - restRemaining) / restTotal;
-
-  const showCompleteButton =
-    totalSets > 0 && completedCount === totalSets;
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -400,18 +395,24 @@ export default function WorkoutDayScreen() {
                 {exercise.sets.map((set, index) => {
                   const key = `${exercise.id}-${set.id}-${index}`;
                   const isDone = !!completedSets[key];
-                  const isHighlighted = key === highlightedKey;
+
+                  // Highlight this as the "ready" set when rest has finished
+                  const isNextHighlight =
+                    !isDone &&
+                    !isResting &&
+                    nextSetKey != null &&
+                    key === nextSetKey;
 
                   return (
                     <View
                       key={set.id}
                       className={`mb-2 flex-row items-center justify-between ${
-                        isHighlighted
-                          ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10 px-2 py-1"
+                        isNextHighlight
+                          ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10"
                           : ""
                       }`}
                     >
-                      <View className="flex-row items-center gap-3">
+                      <View className="flex-row items-center gap-3 px-1 py-1">
                         <Text className="text-xs font-semibold text-zinc-500">
                           {index + 1}
                         </Text>
@@ -431,9 +432,9 @@ export default function WorkoutDayScreen() {
                               </Text>
                             )}
                           </View>
-                          {isHighlighted && (
-                            <Text className="mt-0.5 text-[10px] font-semibold text-[#0df20d]">
-                              Ready – this is your next set
+                          {isNextHighlight && (
+                            <Text className="mt-0.5 text-[11px] font-semibold text-[#0df20d]">
+                              Ready — this is your next set
                             </Text>
                           )}
                         </View>
@@ -443,7 +444,7 @@ export default function WorkoutDayScreen() {
                         className={`h-7 min-w-[88px] items-center justify-center rounded-full border ${
                           isDone
                             ? "border-[#0df20d] bg-[#0df20d]"
-                            : "border-white/30 bg-transparent"
+                            : "border-white/30 bg.transparent"
                         }`}
                         activeOpacity={0.85}
                         onPress={() =>
@@ -466,8 +467,8 @@ export default function WorkoutDayScreen() {
           ))}
         </ScrollView>
 
-        {/* Sticky footer button – only when ALL sets are done */}
-        {showCompleteButton && (
+        {/* Sticky footer button — ONLY when all sets are done */}
+        {allCompleted && (
           <View className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#050816] via-[#050816]/80 to-transparent px-4 pb-6 pt-4">
             <TouchableOpacity
               className="pointer-events-auto h-12 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
@@ -479,7 +480,7 @@ export default function WorkoutDayScreen() {
                 size={18}
                 color="#050816"
               />
-              <Text className="ml-2 text-sm font-bold text-[#050816]">
+              <Text className="ml-2 text-sm font.bold text-[#050816]">
                 Mark workout completed
               </Text>
             </TouchableOpacity>

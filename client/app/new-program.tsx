@@ -13,12 +13,13 @@ import { useProgramStore } from "../lib/ProgramStoreContext";
 import type { Program } from "../lib/mockPrograms";
 
 const GOALS = ["Strength", "Hypertrophy", "Fat Loss", "Endurance"];
-const DAYS_OPTIONS = [2, 3, 4, 5, 6];
+const DAYS_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 const EXPERIENCE_OPTIONS: Program["level"][] = [
   "Beginner",
   "Intermediate",
   "Advanced",
 ];
+const WEEK_OPTIONS = [4, 6, 8, 10, 12, 16, 20, 24];
 
 export default function NewProgramScreen() {
   const router = useRouter();
@@ -29,19 +30,11 @@ export default function NewProgramScreen() {
   const [selectedDays, setSelectedDays] = useState<number | null>(3);
   const [selectedExperience, setSelectedExperience] =
     useState<Program["level"]>("Beginner");
-  const [weeks, setWeeks] = useState(8);
+  const [weeks, setWeeks] = useState<number>(12);
   const [programType, setProgramType] = useState("");
   const [notes, setNotes] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const decreaseWeeks = () => {
-    setWeeks((prev) => Math.max(4, prev - 1));
-  };
-
-  const increaseWeeks = () => {
-    setWeeks((prev) => Math.min(24, prev + 1));
-  };
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -71,6 +64,7 @@ export default function NewProgramScreen() {
         level: selectedExperience,
         daysPerWeek: selectedDays,
         summary,
+        durationWeeks: weeks,
       });
 
       router.replace({
@@ -140,7 +134,7 @@ export default function NewProgramScreen() {
             />
           </View>
 
-          {/* Goal */}
+          {/* Main goal */}
           <View className="mb-6">
             <Text className="pb-2 text-sm font-medium text-neutral-300">
               Main goal
@@ -231,32 +225,43 @@ export default function NewProgramScreen() {
                 );
               })}
             </View>
+            <Text className="mt-2 text-[11px] text-zinc-500">
+              1–2 = light, 3–5 = standard split, 6–7 = high frequency.
+            </Text>
           </View>
 
-          {/* Duration */}
+          {/* Duration (weeks) */}
           <View className="mb-6">
             <Text className="pb-2 text-sm font-medium text-neutral-300">
               Duration (weeks)
             </Text>
-            <View className="relative flex-row items-center">
-              <TouchableOpacity
-                className="absolute left-2 rounded-full p-1"
-                onPress={decreaseWeeks}
-              >
-                <Ionicons name="remove" size={18} color="#9ca3af" />
-              </TouchableOpacity>
-              <View className="mx-auto h-11 w-24 items-center justify-center rounded-full border border-white/15 bg-white/5">
-                <Text className="text-lg font-semibold text-white">
-                  {weeks}
-                </Text>
-              </View>
-              <TouchableOpacity
-                className="absolute right-2 rounded-full p-1"
-                onPress={increaseWeeks}
-              >
-                <Ionicons name="add" size={18} color="#9ca3af" />
-              </TouchableOpacity>
+            <View className="flex-row flex-wrap gap-2">
+              {WEEK_OPTIONS.map((w) => {
+                const selected = weeks === w;
+                return (
+                  <TouchableOpacity
+                    key={w}
+                    onPress={() => setWeeks(w)}
+                    className={`h-9 min-w-[52px] items-center justify-center rounded-full border ${
+                      selected
+                        ? "border-lime-400 bg-lime-400/20"
+                        : "border-white/10 bg-white/5"
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm ${
+                        selected ? "text-lime-300" : "text-neutral-200"
+                      }`}
+                    >
+                      {w}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
+            <Text className="mt-2 text-[11px] text-zinc-500">
+              You can tweak this later. Most people stick with 8–12 weeks.
+            </Text>
           </View>
 
           {/* Optional details */}

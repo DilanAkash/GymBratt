@@ -60,6 +60,18 @@ const EXERCISE_LIBRARY: Pick<ProgramExercise, "name" | "muscleGroup" | "equipmen
   },
 ];
 
+const REP_PRESETS = [
+  "5 reps",
+  "6–8 reps",
+  "8–10 reps",
+  "10–12 reps",
+  "12–15 reps",
+];
+
+const RPE_PRESETS = ["RPE 6", "RPE 7", "RPE 8", "RPE 9"];
+
+const REST_PRESETS = [30, 60, 90, 120];
+
 function cloneDay(day: ProgramDay): ProgramDay {
   return {
     ...day,
@@ -137,7 +149,9 @@ export default function ProgramDayBuilderScreen() {
     }));
   };
 
-  const handleAddExercise = (preset?: typeof EXERCISE_LIBRARY[number]) => {
+  const handleAddExercise = (
+    preset?: (typeof EXERCISE_LIBRARY)[number]
+  ) => {
     const newExercise: ProgramExercise = {
       id: `${draftDay.id}-ex-${Date.now()}`,
       name: preset?.name ?? "New exercise",
@@ -169,7 +183,10 @@ export default function ProgramDayBuilderScreen() {
     }));
   };
 
-  const handleMoveExercise = (exerciseId: string, direction: "up" | "down") => {
+  const handleMoveExercise = (
+    exerciseId: string,
+    direction: "up" | "down"
+  ) => {
     setDraftDay((prev) => {
       const idx = prev.exercises.findIndex((ex) => ex.id === exerciseId);
       if (idx === -1) return prev;
@@ -188,6 +205,18 @@ export default function ProgramDayBuilderScreen() {
 
       return { ...prev, exercises: arr };
     });
+  };
+
+  const handleUpdateExercise = (
+    exerciseId: string,
+    patch: Partial<ProgramExercise>
+  ) => {
+    setDraftDay((prev) => ({
+      ...prev,
+      exercises: prev.exercises.map((ex) =>
+        ex.id === exerciseId ? { ...ex, ...patch } : ex
+      ),
+    }));
   };
 
   const handleUpdateSet = (
@@ -253,7 +282,6 @@ export default function ProgramDayBuilderScreen() {
   const handleSave = () => {
     setIsSaving(true);
     try {
-      // Build new days list for this program
       const updatedDays = program.days.map((day) =>
         day.id === draftDay.id
           ? {
@@ -289,7 +317,7 @@ export default function ProgramDayBuilderScreen() {
       <View className="border-b border-white/10 bg-[#050816]/80 px-4 pb-3 pt-4">
         <View className="flex-row items-center justify-between">
           <TouchableOpacity
-            className="h-9 w-9 items-center justify-center rounded-full bg-white/10"
+            className="h-9 w-9 items-center justify-center rounded-full bg.white/10"
             onPress={() => router.back()}
           >
             <Ionicons name="chevron-back" size={20} color="#ffffff" />
@@ -362,17 +390,56 @@ export default function ProgramDayBuilderScreen() {
                 className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4"
               >
                 {/* Exercise header */}
-                <View className="mb-2 flex-row items-start justify-between">
+                <View className="mb-3 flex-row items-start justify-between">
                   <View className="flex-1 pr-2">
                     <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
                       Exercise {exIndex + 1}
                     </Text>
-                    <Text className="mt-1 text-sm font-semibold text-slate-50">
-                      {exercise.name}
-                    </Text>
-                    <Text className="mt-1 text-xs text-zinc-400">
-                      {exercise.muscleGroup} · {exercise.equipment}
-                    </Text>
+                    <TextInput
+                      value={exercise.name}
+                      onChangeText={(value) =>
+                        handleUpdateExercise(exercise.id, {
+                          name: value,
+                        })
+                      }
+                      placeholder="Exercise name"
+                      placeholderTextColor="#6b7280"
+                      className="mt-1 text-sm font-semibold text-slate-50"
+                    />
+                    <View className="mt-1 flex-row gap-2">
+                      <View className="flex-1">
+                        <Text className="pb-1 text-[11px] text-zinc-400">
+                          Muscle group
+                        </Text>
+                        <TextInput
+                          value={exercise.muscleGroup}
+                          onChangeText={(value) =>
+                            handleUpdateExercise(exercise.id, {
+                              muscleGroup: value,
+                            })
+                          }
+                          placeholder="e.g. Chest, Back, Legs"
+                          placeholderTextColor="#6b7280"
+                          className="h-9 rounded-lg bg-black/30 px-3 text-xs text-slate-100"
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="pb-1 text-[11px] text-zinc-400">
+                          Equipment
+                        </Text>
+                        <TextInput
+                          value={exercise.equipment}
+                          onChangeText={(value) =>
+                            handleUpdateExercise(exercise.id, {
+                              equipment: value,
+                            })
+                          }
+                          placeholder="e.g. Barbell, Dumbbells, Machine"
+                          placeholderTextColor="#6b7280"
+                          className="h-9 rounded-lg bg-black/30 px-3 text-xs text-slate-100"
+                        />
+                      </View>
+                    </View>
                   </View>
 
                   <View className="items-end gap-1">
@@ -449,58 +516,142 @@ export default function ProgramDayBuilderScreen() {
                         </TouchableOpacity>
                       </View>
 
-                      <View className="gap-2">
-                        <View>
+                      {/* Target reps */}
+                      <View className="mb-2">
+                        <Text className="pb-1 text-[11px] text-zinc-400">
+                          Target reps
+                        </Text>
+                        <View className="mb-1 flex-row flex-wrap gap-1">
+                          {REP_PRESETS.map((preset) => (
+                            <TouchableOpacity
+                              key={preset}
+                              onPress={() =>
+                                handleUpdateSet(
+                                  exercise.id,
+                                  setIndex,
+                                  { targetReps: preset }
+                                )
+                              }
+                              className={`rounded-full border px-2 py-1 ${
+                                set.targetReps === preset
+                                  ? "border-lime-400 bg-lime-400/20"
+                                  : "border-white/10 bg-black/40"
+                              }`}
+                            >
+                              <Text className="text-[10px] text-slate-100">
+                                {preset}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                        <TextInput
+                          value={set.targetReps}
+                          onChangeText={(value) =>
+                            handleUpdateSet(exercise.id, setIndex, {
+                              targetReps: value,
+                            })
+                          }
+                          placeholder="e.g. 8–10 reps"
+                          placeholderTextColor="#6b7280"
+                          className="h-9 rounded-lg border border-white/15 bg-black/40 px-3 text-xs text-slate-100"
+                        />
+                      </View>
+
+                      {/* RPE + Rest */}
+                      <View className="flex-row gap-2">
+                        <View className="flex-1">
                           <Text className="pb-1 text-[11px] text-zinc-400">
-                            Target reps
+                            RPE
                           </Text>
+                          <View className="mb-1 flex-row flex-wrap gap-1">
+                            {RPE_PRESETS.map((preset) => (
+                              <TouchableOpacity
+                                key={preset}
+                                onPress={() =>
+                                  handleUpdateSet(
+                                    exercise.id,
+                                    setIndex,
+                                    { rpe: preset }
+                                  )
+                                }
+                                className={`rounded-full border px-2 py-1 ${
+                                  set.rpe === preset
+                                    ? "border-lime-400 bg-lime-400/20"
+                                    : "border-white/10 bg-black/40"
+                                }`}
+                              >
+                                <Text className="text-[10px] text-slate-100">
+                                  {preset}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
                           <TextInput
-                            value={set.targetReps}
+                            value={set.rpe ?? ""}
                             onChangeText={(value) =>
                               handleUpdateSet(exercise.id, setIndex, {
-                                targetReps: value,
+                                rpe: value,
                               })
                             }
-                            placeholder="e.g. 8–10 reps"
+                            placeholder="e.g. RPE 8"
                             placeholderTextColor="#6b7280"
                             className="h-9 rounded-lg border border-white/15 bg-black/40 px-3 text-xs text-slate-100"
                           />
                         </View>
 
-                        <View className="flex-row gap-2">
-                          <View className="flex-1">
-                            <Text className="pb-1 text-[11px] text-zinc-400">
-                              RPE
-                            </Text>
-                            <TextInput
-                              value={set.rpe ?? ""}
-                              onChangeText={(value) =>
-                                handleUpdateSet(exercise.id, setIndex, {
-                                  rpe: value,
-                                })
-                              }
-                              placeholder="e.g. RPE 8"
-                              placeholderTextColor="#6b7280"
-                              className="h-9 rounded-lg border border-white/15 bg-black/40 px-3 text-xs text-slate-100"
-                            />
-                          </View>
+                        <View className="flex-1">
+                          <Text className="pb-1 text-[11px] text-zinc-400">
+                            Rest
+                          </Text>
+                          <View className="mb-1 flex-row flex-wrap gap-1">
+                            {REST_PRESETS.map((secs) => {
+                              const label = `${secs}s`;
+                              const currentSeconds =
+                                set.restSeconds ??
+                                parseRestStringToSeconds(set.rest ?? undefined);
 
-                          <View className="flex-1">
-                            <Text className="pb-1 text-[11px] text-zinc-400">
-                              Rest
-                            </Text>
-                            <TextInput
-                              value={set.rest ?? ""}
-                              onChangeText={(value) =>
-                                handleUpdateSet(exercise.id, setIndex, {
-                                  rest: value,
-                                })
-                              }
-                              placeholder="e.g. Rest 90s"
-                              placeholderTextColor="#6b7280"
-                              className="h-9 rounded-lg border border-white/15 bg-black/40 px-3 text-xs text-slate-100"
-                            />
+                              const selected = currentSeconds === secs;
+
+                              return (
+                                <TouchableOpacity
+                                  key={secs}
+                                  onPress={() =>
+                                    handleUpdateSet(
+                                      exercise.id,
+                                      setIndex,
+                                      {
+                                        rest: `Rest ${label}`,
+                                        restSeconds: secs,
+                                      }
+                                    )
+                                  }
+                                  className={`rounded-full border px-2 py-1 ${
+                                    selected
+                                      ? "border-lime-400 bg-lime-400/20"
+                                      : "border-white/10 bg-black/40"
+                                  }`}
+                                >
+                                  <Text className="text-[10px] text-slate-100">
+                                    {label}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
                           </View>
+                          <TextInput
+                            value={set.rest ?? ""}
+                            onChangeText={(value) =>
+                              handleUpdateSet(exercise.id, setIndex, {
+                                rest: value,
+                                restSeconds:
+                                  parseRestStringToSeconds(value) ??
+                                  set.restSeconds,
+                              })
+                            }
+                            placeholder="e.g. Rest 90s"
+                            placeholderTextColor="#6b7280"
+                            className="h-9 rounded-lg border border-white/15 bg-black/40 px-3 text-xs text-slate-100"
+                          />
                         </View>
                       </View>
                     </View>

@@ -1,14 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   type Program,
   type ProgramDay,
 } from "../lib/mockPrograms";
 import { useProgramStore } from "../lib/ProgramStoreContext";
-
-const PRIMARY = "#0df20d";
 
 type ProgramDetailsParams = {
   programId?: string;
@@ -38,7 +42,8 @@ export default function ProgramDetailsScreen() {
 
   const completion =
     program.progress.totalWorkouts > 0
-      ? program.progress.completedWorkouts / program.progress.totalWorkouts
+      ? program.progress.completedWorkouts /
+        program.progress.totalWorkouts
       : 0;
 
   const completionPercent = Math.round(completion * 100);
@@ -69,14 +74,25 @@ export default function ProgramDetailsScreen() {
   const sourceLabel =
     program.source === "coach" ? "Coach program" : "My program";
 
-  const startDay =
-    program.days.find((d) => d.status === "today") ?? program.days[0];
-
   const handleStartToday = () => {
-    if (!startDay) return;
+    if (!program.days || program.days.length === 0) {
+      Alert.alert(
+        "No workouts yet",
+        "This program has no workout days. Edit the program to add sessions first."
+      );
+      return;
+    }
+
+    const todayDay =
+      program.days.find((d) => d.status === "today") ||
+      program.days[0];
+
     router.push({
       pathname: "/workout-day",
-      params: { programId: program.id, dayId: startDay.id },
+      params: {
+        programId: program.id,
+        dayId: todayDay.id,
+      },
     });
   };
 
@@ -84,6 +100,13 @@ export default function ProgramDetailsScreen() {
     router.push({
       pathname: "/workout-day",
       params: { programId: program.id, dayId: day.id },
+    });
+  };
+
+  const handleEditProgram = () => {
+    router.push({
+      pathname: "/new-program-builder",
+      params: { programId: program.id },
     });
   };
 
@@ -103,7 +126,14 @@ export default function ProgramDetailsScreen() {
             Program details
           </Text>
 
-          <View className="h-9 w-9" />
+          <TouchableOpacity
+            onPress={handleEditProgram}
+            className="h-9 items-center justify-center rounded-full bg-white/10 px-3"
+          >
+            <Text className="text-[11px] font-semibold text-slate-100">
+              Edit
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -125,7 +155,7 @@ export default function ProgramDetailsScreen() {
                 </Text>
               </View>
               {program.coachName && (
-                <View className="rounded-full bg-white/10 px-3 py-1">
+                <View className="rounded-full bg.white/10 px-3 py-1">
                   <Text className="text-[11px] text-zinc-300">
                     {program.coachName}
                   </Text>
@@ -199,84 +229,102 @@ export default function ProgramDetailsScreen() {
           </View>
 
           <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-4">
-            {weeks.map(([weekNumber, days], index) => (
-              <View key={weekNumber}>
-                {index > 0 && (
-                  <View className="my-3 h-[1px] w-full bg-white/10" />
-                )}
+            {program.days.length === 0 ? (
+              <Text className="text-sm text-zinc-300">
+                No workout days yet. Tap the{" "}
+                <Text className="font-semibold">Edit</Text> button to
+                add days and exercises.
+              </Text>
+            ) : (
+              weeks.map(([weekNumber, days], index) => (
+                <View key={weekNumber}>
+                  {index > 0 && (
+                    <View className="my-3 h-[1px] w-full bg-white/10" />
+                  )}
 
-                <Text className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
-                  Week {weekNumber}
-                </Text>
+                  <Text className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400">
+                    Week {weekNumber}
+                  </Text>
 
-                {days
-                  .slice()
-                  .sort((a, b) => a.dayIndex - b.dayIndex)
-                  .map((day) => {
-                    let statusLabel = "";
-                    let statusColor = "";
+                  {days
+                    .slice()
+                    .sort((a, b) => a.dayIndex - b.dayIndex)
+                    .map((day) => {
+                      let statusLabel = "";
+                      let statusColor = "";
 
-                    if (day.status === "today") {
-                      statusLabel = "Today";
-                      statusColor = "text-[#0df20d]";
-                    } else if (day.status === "completed") {
-                      statusLabel = "Done";
-                      statusColor = "text-emerald-300";
-                    } else {
-                      statusLabel = "Upcoming";
-                      statusColor = "text-zinc-400";
-                    }
+                      if (day.status === "today") {
+                        statusLabel = "Today";
+                        statusColor = "text-[#0df20d]";
+                      } else if (day.status === "completed") {
+                        statusLabel = "Done";
+                        statusColor = "text-emerald-300";
+                      } else {
+                        statusLabel = "Upcoming";
+                        statusColor = "text-zinc-400";
+                      }
 
-                    return (
-                      <TouchableOpacity
-                        key={day.id}
-                        className="mb-2 flex-row items-center justify-between rounded-2xl bg-black/40 px-3 py-3"
-                        activeOpacity={0.9}
-                        onPress={() => handleDayPress(day)}
-                      >
-                        <View className="flex-1 pr-2">
-                          <Text className="text-sm font-semibold text-slate-50">
-                            {day.title}
-                          </Text>
-                          <Text className="mt-1 text-xs text-zinc-400">
-                            {day.subtitle}
-                          </Text>
-                          <Text className="mt-1 text-[11px] text-zinc-500">
-                            {day.focus}
-                          </Text>
-                        </View>
+                      return (
+                        <TouchableOpacity
+                          key={day.id}
+                          className="mb-2 flex-row items-center justify-between rounded-2xl bg-black/40 px-3 py-3"
+                          activeOpacity={0.9}
+                          onPress={() => handleDayPress(day)}
+                        >
+                          <View className="flex-1 pr-2">
+                            <Text className="text-sm font-semibold text-slate-50">
+                              {day.title}
+                            </Text>
+                            <Text className="mt-1 text-xs text-zinc-400">
+                              {day.subtitle}
+                            </Text>
+                            <Text className="mt-1 text-[11px] text-zinc-500">
+                              {day.focus}
+                            </Text>
+                          </View>
 
-                        <View className="items-end">
-                          <Text
-                            className={`text-xs font-semibold ${statusColor}`}
-                          >
-                            {statusLabel}
-                          </Text>
-                          <Ionicons
-                            name="chevron-forward"
-                            size={18}
-                            color="#6b7280"
-                            style={{ marginTop: 6 }}
-                          />
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-              </View>
-            ))}
+                          <View className="items-end">
+                            <Text
+                              className={`text-xs font-semibold ${statusColor}`}
+                            >
+                              {statusLabel}
+                            </Text>
+                            <Ionicons
+                              name="chevron-forward"
+                              size={18}
+                              color="#6b7280"
+                              style={{ marginTop: 6 }}
+                            />
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                </View>
+              ))
+            )}
           </View>
         </ScrollView>
 
-        {/* Sticky footer button */}
+        {/* Sticky footer buttons */}
         <View className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#050816] via-[#050816]/80 to-transparent px-4 pb-6 pt-4">
           <TouchableOpacity
-            className="pointer-events-auto h-12 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
+            className="pointer-events-auto mb-3 h-12 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
             activeOpacity={0.9}
             onPress={handleStartToday}
           >
             <Ionicons name="play" size={18} color="#050816" />
             <Text className="ml-2 text-sm font-bold text-[#050816]">
               Start today&apos;s workout
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="pointer-events-auto h-11 items-center justify-center rounded-xl border border-white/20 bg-white/5"
+            activeOpacity={0.9}
+            onPress={handleEditProgram}
+          >
+            <Text className="text-xs font-semibold text-slate-100">
+              Edit program structure
             </Text>
           </TouchableOpacity>
         </View>

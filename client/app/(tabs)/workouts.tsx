@@ -1,46 +1,51 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { type Program } from "../../lib/mockPrograms";
 import { useProgramStore } from "../../lib/ProgramStoreContext";
 
-const PRIMARY = "#0df20d";
-
-function ProgramCard({
-  program,
-  onPress,
-}: {
+type ProgramCardProps = {
   program: Program;
   onPress: () => void;
-}) {
+  onDelete?: () => void;
+};
+
+function ProgramCard({ program, onPress, onDelete }: ProgramCardProps) {
   const completion =
     program.progress.totalWorkouts > 0
-      ? program.progress.completedWorkouts / program.progress.totalWorkouts
+      ? program.progress.completedWorkouts /
+        program.progress.totalWorkouts
       : 0;
 
   const percentage = Math.round(completion * 100);
-
   const sourceLabel =
     program.source === "coach" ? "Coach program" : "My program";
 
   return (
-    <TouchableOpacity
-      className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4"
-      activeOpacity={0.9}
-      onPress={onPress}
-    >
-      <View className="flex-row items-start justify-between">
+    <View className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4">
+      <View className="mb-2 flex-row items-start justify-between">
         <View className="flex-1 pr-3">
           <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
             {sourceLabel}
           </Text>
-          <Text className="mt-1 text-[15px] font-semibold text-slate-50">
-            {program.name}
-          </Text>
-          <Text className="mt-1 text-xs text-zinc-400">
-            {program.goal}
-          </Text>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={onPress}
+          >
+            <Text className="mt-1 text-[15px] font-semibold text-slate-50">
+              {program.name}
+            </Text>
+            <Text className="mt-1 text-xs text-zinc-400">
+              {program.goal}
+            </Text>
+          </TouchableOpacity>
 
           <View className="mt-2 flex-row flex-wrap gap-2">
             <View className="rounded-full bg-white/10 px-2.5 py-1">
@@ -78,6 +83,19 @@ function ProgramCard({
               {percentage}%
             </Text>
           </View>
+
+          {onDelete && (
+            <TouchableOpacity
+              onPress={onDelete}
+              className="mt-3 h-8 w-8 items-center justify-center rounded-full bg-white/10"
+            >
+              <Ionicons
+                name="trash-outline"
+                size={16}
+                color="#fca5a5"
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -88,16 +106,31 @@ function ProgramCard({
           style={{ width: `${percentage}%` }}
         />
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
 export default function WorkoutsScreen() {
   const router = useRouter();
-  const { programs } = useProgramStore();
+  const { programs, deleteProgram } = useProgramStore();
 
   const coachPrograms = programs.filter((p) => p.source === "coach");
   const myPrograms = programs.filter((p) => p.source === "user");
+
+  const confirmDeleteProgram = (program: Program) => {
+    Alert.alert(
+      "Delete program",
+      `Are you sure you want to delete "${program.name}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteProgram(program.id),
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -182,6 +215,7 @@ export default function WorkoutsScreen() {
                     params: { programId: program.id },
                   })
                 }
+                onDelete={() => confirmDeleteProgram(program)}
               />
             ))
           )}

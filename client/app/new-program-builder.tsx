@@ -82,11 +82,6 @@ export default function NewProgramBuilderScreen() {
         ? Math.max(...existing.map((d) => d.dayIndex)) + 1
         : 1;
 
-    const templateExercises =
-      existing[0]?.exercises ||
-      program.days[0]?.exercises ||
-      [];
-
     const newDay: ProgramDay = {
       id: `${program.id}-w${selectedWeek}-d${Date.now()}`,
       title: `Day ${nextDayIndex} — Custom session`,
@@ -95,11 +90,13 @@ export default function NewProgramBuilderScreen() {
       weekIndex: selectedWeek,
       dayIndex: nextDayIndex,
       status: "upcoming",
-      exercises: templateExercises,
+      // 🔥 No default exercises. User adds them in day builder.
+      exercises: [],
     };
 
     setDraftDays((prev) => [...prev, newDay]);
   };
+
 
   const handleRemoveDay = (dayId: string) => {
     setDraftDays((prev) => prev.filter((d) => d.id !== dayId));
