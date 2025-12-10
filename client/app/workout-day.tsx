@@ -103,8 +103,8 @@ export default function WorkoutDayScreen() {
   const [upNext, setUpNext] = useState<UpNextInfo | null>(null);
   const [nextSetKey, setNextSetKey] = useState<string | null>(null);
 
-  const restIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const restAlertLoopRef = useRef<NodeJS.Timeout | null>(null);
+  const restIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restAlertLoopRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
 
   // For completion button state
@@ -138,7 +138,7 @@ export default function WorkoutDayScreen() {
 
     try {
       await soundRef.current?.stopAsync();
-    } catch (e) {
+    } catch {
       // noop
     }
   }, []);
@@ -146,7 +146,7 @@ export default function WorkoutDayScreen() {
   const unloadRestSound = useCallback(async () => {
     try {
       await soundRef.current?.unloadAsync();
-    } catch (e) {
+    } catch {
       // noop
     }
     soundRef.current = null;
@@ -163,14 +163,14 @@ export default function WorkoutDayScreen() {
           require("../assets/sounds/rest-complete.wav")
         );
         soundRef.current = sound;
-      } catch (e) {
+    } catch {
         return;
       }
     }
 
     try {
       await soundRef.current.replayAsync();
-    } catch (e) {
+    } catch {
       // noop
     }
   }, []);
@@ -237,14 +237,6 @@ export default function WorkoutDayScreen() {
     stopRestNotifications,
   ]);
 
-  useEffect(() => {
-    return () => {
-      clearRest();
-      stopRestNotifications();
-      unloadRestSound();
-    };
-  }, [stopRestNotifications, unloadRestSound]);
-
   const acknowledgeRest = () => {
     setRestAcknowledged(true);
     setIsResting(false);
@@ -299,7 +291,7 @@ export default function WorkoutDayScreen() {
     }
   };
 
-  const clearRest = () => {
+  const clearRest = useCallback(() => {
     if (restIntervalRef.current) {
       clearInterval(restIntervalRef.current);
       restIntervalRef.current = null;
@@ -314,7 +306,15 @@ export default function WorkoutDayScreen() {
     setActiveRestKey(null);
     setUpNext(null);
     setNextSetKey(null);
-  };
+  }, [stopRestNotifications]);
+
+  useEffect(() => {
+    return () => {
+      clearRest();
+      stopRestNotifications();
+      unloadRestSound();
+    };
+  }, [clearRest, stopRestNotifications, unloadRestSound]);
 
   const handleExercisePress = (exercise: ProgramExercise) => {
     router.push({
