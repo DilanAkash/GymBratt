@@ -92,7 +92,6 @@ export default function WorkoutDayScreen() {
   const [restTotal, setRestTotal] = useState(0);
   const [upNext, setUpNext] = useState<UpNextInfo | null>(null);
   const [nextSetKey, setNextSetKey] = useState<string | null>(null);
-  const [restNotifyActive, setRestNotifyActive] = useState(false);
 
   // For completion button state
   const [isCompleting, setIsCompleting] = useState(false);
@@ -127,7 +126,10 @@ export default function WorkoutDayScreen() {
           // Rest finished
           // Stop timer, but keep nextSetKey & upNext so highlight shows
           setIsResting(false);
-          setRestNotifyActive(true);
+          // HAPTIC NOTIFY
+          Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success
+          ).catch(() => {});
           return 0;
         }
         return next;
@@ -136,21 +138,6 @@ export default function WorkoutDayScreen() {
 
     return () => clearInterval(id);
   }, [isResting, restRemaining]);
-
-  // When rest ends, pulse haptics until the user acknowledges the notification
-  useEffect(() => {
-    if (!restNotifyActive) return;
-
-    const vibrate = () =>
-      Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success
-      ).catch(() => {});
-
-    vibrate();
-    const id = setInterval(vibrate, 1800);
-
-    return () => clearInterval(id);
-  }, [restNotifyActive]);
 
   const startRest = (
     key: string,
@@ -170,7 +157,6 @@ export default function WorkoutDayScreen() {
     setIsResting(true);
     setRestRemaining(seconds);
     setRestTotal(seconds);
-    setRestNotifyActive(false);
 
     // Figure out the "up next" set
     const flatIndex = allSets.findIndex((s) => s.key === key);
@@ -200,11 +186,6 @@ export default function WorkoutDayScreen() {
     setActiveRestKey(null);
     setUpNext(null);
     setNextSetKey(null);
-    setRestNotifyActive(false);
-  };
-
-  const acknowledgeRestNotification = () => {
-    setRestNotifyActive(false);
   };
 
   const handleExercisePress = (exercise: ProgramExercise) => {
@@ -274,8 +255,6 @@ export default function WorkoutDayScreen() {
     } catch (e) {
       console.error("Error completing workout", e);
       setIsCompleting(false);
-    } finally {
-      setIsCompleting(false);
     }
   };
 
@@ -338,34 +317,6 @@ export default function WorkoutDayScreen() {
               </View>
             </View>
           </View>
-
-          {/* Rest finished alert */}
-          {restNotifyActive && !isResting && (
-            <View className="mb-4 rounded-3xl border border-emerald-400/60 bg-emerald-500/10 p-4">
-              <View className="flex-row items-start justify-between gap-3">
-                <View className="flex-1">
-                  <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
-                    Rest finished
-                  </Text>
-                  <Text className="mt-1 text-base font-semibold text-emerald-50">
-                    Time to crush the next set.
-                  </Text>
-                  <Text className="mt-1 text-[12px] text-emerald-100/80">
-                    Vibration will keep buzzing until you acknowledge this.
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  className="h-9 items-center justify-center rounded-full bg-emerald-400 px-3"
-                  activeOpacity={0.85}
-                  onPress={acknowledgeRestNotification}
-                >
-                  <Text className="text-[12px] font-semibold text-[#050816]">
-                    I’m ready
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
 
           {/* Rest timer card (only visible while resting) */}
           {isResting && restTotal > 0 && (
