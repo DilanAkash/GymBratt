@@ -6,6 +6,7 @@ import React, {
 } from "react";
 import {
     MOCK_PROGRAMS,
+    type DayStatus,
     type Program,
     type ProgramDay
 } from "./mockPrograms";
@@ -78,10 +79,15 @@ export const ProgramStoreProvider = ({
         const weeks = new Set(days.map((d) => d.weekIndex));
         const weeksCount = weeks.size || 1;
         const daysPerWeek =
-          weeksCount > 0 ? Math.max(1, Math.round(days.length / weeksCount)) : p.daysPerWeek;
+          weeksCount > 0
+            ? Math.max(1, Math.round(days.length / weeksCount))
+            : p.daysPerWeek;
 
         const totalWorkouts =
-          days.length > 0 ? days.length * Math.max(1, p.durationWeeks / weeksCount) : p.progress.totalWorkouts;
+          days.length > 0
+            ? days.length *
+              Math.max(1, Math.round(p.durationWeeks / weeksCount))
+            : p.progress.totalWorkouts;
 
         return {
           ...p,
@@ -106,17 +112,24 @@ export const ProgramStoreProvider = ({
 
   const completeWorkoutDay = (programId: string, dayId: string) => {
     setPrograms((prev) =>
-      prev.map((p) => {
+      prev.map((p): Program => {
         if (p.id !== programId) return p;
 
         let alreadyCompleted = false;
-        const updatedDays = p.days.map((d) => {
-          if (d.id === dayId) {
-            if (d.status === "completed") alreadyCompleted = true;
-            return { ...d, status: "completed" };
+
+        // First pass: mark the target day as completed
+        const updatedDays: ProgramDay[] = p.days.map(
+          (d): ProgramDay => {
+            if (d.id === dayId) {
+              if (d.status === "completed") alreadyCompleted = true;
+              return {
+                ...d,
+                status: "completed" as DayStatus,
+              };
+            }
+            return d;
           }
-          return d;
-        });
+        );
 
         let completedWorkouts = p.progress.completedWorkouts;
         let totalWorkouts =
@@ -129,15 +142,20 @@ export const ProgramStoreProvider = ({
           );
         }
 
-        // Set the next "today" day if any upcoming
+        // Find next upcoming day to mark as "today"
         const nextUpcoming = updatedDays.find(
           (d) => d.status === "upcoming"
         );
-        const finalDays = nextUpcoming
-          ? updatedDays.map((d) =>
-              d.id === nextUpcoming.id
-                ? { ...d, status: "today" }
-                : d
+
+        const finalDays: ProgramDay[] = nextUpcoming
+          ? updatedDays.map(
+              (d): ProgramDay =>
+                d.id === nextUpcoming.id
+                  ? {
+                      ...d,
+                      status: "today" as DayStatus,
+                    }
+                  : d
             )
           : updatedDays;
 
