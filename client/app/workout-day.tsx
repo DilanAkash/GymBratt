@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -84,16 +86,17 @@ export default function WorkoutDayScreen() {
   const [completedSets, setCompletedSets] = useState<CompletedMap>({});
 
   // 🔥 Rest timer state
-  const [activeRestKey, setActiveRestKey] = useState<string | null>(
-    null
-  );
+  const [activeRestKey, setActiveRestKey] = useState<string | null>(null);
   const [isResting, setIsResting] = useState(false);
   const [restRemaining, setRestRemaining] = useState(0);
   const [restTotal, setRestTotal] = useState(0);
   const [upNext, setUpNext] = useState<UpNextInfo | null>(null);
   const [nextSetKey, setNextSetKey] = useState<string | null>(null);
 
-  // Flatten all sets so we can figure out "up next" easily
+  // For completion button state
+  const [isCompleting, setIsCompleting] = useState(false);
+
+  // Flatten all sets so we can figure out "up next" and progress easily
   const allSets = useMemo(
     () =>
       day.exercises.flatMap((ex) =>
@@ -108,12 +111,8 @@ export default function WorkoutDayScreen() {
   );
 
   const totalSets = allSets.length;
-  const completedCount = allSets.filter(
-    (s) => completedSets[s.key]
-  ).length;
-  const progress =
-    totalSets > 0 ? completedCount / totalSets : 0;
-
+  const completedCount = allSets.filter((s) => completedSets[s.key]).length;
+  const progress = totalSets > 0 ? completedCount / totalSets : 0;
   const allCompleted = totalSets > 0 && completedCount === totalSets;
 
   // ⏱ Timer effect – counts down once per second when resting
@@ -124,8 +123,13 @@ export default function WorkoutDayScreen() {
       setRestRemaining((prev) => {
         const next = prev - 1;
         if (next <= 0) {
-          // Rest finished → stop timer, keep nextSetKey
+          // Rest finished
+          // Stop timer, but keep nextSetKey & upNext so highlight shows
           setIsResting(false);
+          // HAPTIC NOTIFY
+          Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Success
+          ).catch(() => {});
           return 0;
         }
         return next;
@@ -184,22 +188,6 @@ export default function WorkoutDayScreen() {
     setNextSetKey(null);
   };
 
-  const markAllCompleted = () => {
-    const next: CompletedMap = {};
-    for (const s of allSets) {
-      next[s.key] = true;
-    }
-    setCompletedSets(next);
-    clearRest();
-
-    // 🔥 Update store + go back to program details
-    completeWorkoutDay(program.id, day.id);
-    router.replace({
-      pathname: "/program-details",
-      params: { programId: program.id },
-    });
-  };
-
   const handleExercisePress = (exercise: ProgramExercise) => {
     router.push({
       pathname: "/exercise-details",
@@ -242,6 +230,33 @@ export default function WorkoutDayScreen() {
     !isResting || restTotal <= 0
       ? 0
       : (restTotal - restRemaining) / restTotal;
+
+  const markAllCompleted = async () => {
+    if (!allCompleted) return;
+
+    try {
+      setIsCompleting(true);
+      clearRest();
+
+      // Vibrate a bit on completion
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success
+      ).catch(() => {});
+
+      completeWorkoutDay(program.id, day.id);
+
+      // Tiny UX feedback
+      Alert.alert("Nice work 💪", "Workout marked as completed.");
+
+      router.replace({
+        pathname: "/program-details",
+        params: { programId: program.id },
+      });
+    } catch (e) {
+      console.error("Error completing workout", e);
+      setIsCompleting(false);
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -315,7 +330,7 @@ export default function WorkoutDayScreen() {
                     {formatSeconds(restRemaining)}
                   </Text>
                   <Text className="mt-1 text-[11px] text-emerald-100/80">
-                    Stay loose, breathe, get ready for the next set.
+                    Breathe, shake it out, get ready for the next set.
                   </Text>
                 </View>
 
@@ -368,7 +383,7 @@ export default function WorkoutDayScreen() {
           {day.exercises.map((exercise) => (
             <View
               key={exercise.id}
-              className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4"
+              className="mb-4 rounded-3xl border border.white/10 bg-white/5 p-4"
             >
               <TouchableOpacity
                 activeOpacity={0.85}
@@ -444,7 +459,7 @@ export default function WorkoutDayScreen() {
                         className={`h-7 min-w-[88px] items-center justify-center rounded-full border ${
                           isDone
                             ? "border-[#0df20d] bg-[#0df20d]"
-                            : "border-white/30 bg.transparent"
+                            : "border-white/30 bg-transparent"
                         }`}
                         activeOpacity={0.85}
                         onPress={() =>
@@ -474,14 +489,17 @@ export default function WorkoutDayScreen() {
               className="pointer-events-auto h-12 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
               activeOpacity={0.9}
               onPress={markAllCompleted}
+              disabled={isCompleting}
             >
               <Ionicons
                 name="checkmark-circle-outline"
                 size={18}
                 color="#050816"
               />
-              <Text className="ml-2 text-sm font.bold text-[#050816]">
-                Mark workout completed
+              <Text className="ml-2 text-sm font-bold text-[#050816]">
+                {isCompleting
+                  ? "Finishing..."
+                  : "Mark workout completed"}
               </Text>
             </TouchableOpacity>
           </View>
