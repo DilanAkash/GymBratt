@@ -29,9 +29,16 @@ function RootLayoutNav() {
 
   const isLogged = !!user?.uid;
 
-  // KEY TRICK: Changing the key forces the Stack to unmount and remount, clearing history.
+  // We remove the 'key' to allow smooth transitions.
+  // We rely on 'redirect' props and 'gestureEnabled: false' to secure the navigation.
   return (
-    <Stack screenOptions={{ headerShown: false }} key={isLogged ? "auth" : "guest"}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: "#050816" },
+        animation: "slide_from_right", // Premium smooth transition
+      }}
+    >
       {/* 
         IMPORTANT: No Fragments (<>...</>) allowed inside Stack!
         We list ALL screens and use 'redirect' to control access.
@@ -39,7 +46,7 @@ function RootLayoutNav() {
 
       {/* Public / Global */}
       <Stack.Screen name="splash" />
-      <Stack.Screen name="modal" />
+      <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
 
       {/* Auth Screens - Redirect to Tabs if logged in */}
       <Stack.Screen name="welcome" redirect={isLogged} />
