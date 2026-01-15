@@ -19,6 +19,7 @@ import {
   type ProgramSetSchema,
 } from "../lib/mockPrograms";
 import { useProgramStore } from "../lib/ProgramStoreContext";
+import { ConfettiCelebration } from "../components/ConfettiCelebration";
 
 type WorkoutDayParams = {
   programId?: string;
@@ -86,6 +87,9 @@ export default function WorkoutDayScreen() {
   );
 
   const [completedSets, setCompletedSets] = useState<CompletedMap>({});
+
+  // Celebration State
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // Overall workout session status
   const [workoutStatus, setWorkoutStatus] = useState<
@@ -440,30 +444,21 @@ export default function WorkoutDayScreen() {
       clearRest();
       setWorkoutStatus("completed");
 
-      // Vibrate a bit on completion
-      await Haptics.notificationAsync(
-        Haptics.NotificationFeedbackType.Success
-      ).catch(() => { });
+      // 🎉 Trigger Celebration
+      setShowCelebration(true);
 
       await Promise.resolve(
         completeWorkoutDay(program.id, day.id)
       );
 
-      // Tiny UX feedback
-      Alert.alert("Nice work 💪", "Workout marked as completed.");
+      // Wait 2.5s for the user to enjoy the confetti
+      setTimeout(() => {
+        router.replace({
+          pathname: "/program-details",
+          params: { programId: program.id },
+        });
+      }, 2500);
 
-      router.back(); // Go back first to ensure context update is picked up or simple nav
-      // Wait, router.back() might not be enough if we came deep?
-      // Use router.dismissTo or navigate? The plan said "Navigate back to program-details"
-      // router.replace is fine but maybe push/replace stack issues?
-      // router.navigate('/program-details', { params: ... }) is safer usually if strictly hierarchical
-      // But let's stick to router.replace as in original code or router.back if purely stack.
-      // Original code used router.replace. I'll stick to it.
-
-      router.replace({
-        pathname: "/program-details",
-        params: { programId: program.id },
-      });
     } catch (e) {
       console.error("Error completing workout", e);
       Alert.alert(
@@ -471,14 +466,16 @@ export default function WorkoutDayScreen() {
         "We couldn't mark the workout completed. Please try again."
       );
       setIsCompleting(false);
+      setShowCelebration(false);
     } finally {
-      setIsCompleting(false);
       stopRestNotifications();
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
+      <ConfettiCelebration trigger={showCelebration} />
+
       {/* Header */}
       <View className="border-b border-white/10 bg-[#050816]/80 px-4 pb-2 pt-3">
         <View className="flex-row items-center justify-between">
@@ -727,8 +724,8 @@ export default function WorkoutDayScreen() {
                     <View
                       key={key}
                       className={`mb-2 flex-row items-center justify-between ${isNextHighlight
-                          ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10"
-                          : ""
+                        ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10"
+                        : ""
                         }`}
                     >
                       <View className="flex-row items-center gap-3 px-1 py-1">
@@ -761,8 +758,8 @@ export default function WorkoutDayScreen() {
 
                       <TouchableOpacity
                         className={`h-7 min-w-[88px] items-center justify-center rounded-full border ${isDone
-                            ? "border-[#0df20d] bg-[#0df20d]"
-                            : "border-white/30 bg-transparent"
+                          ? "border-[#0df20d] bg-[#0df20d]"
+                          : "border-white/30 bg-transparent"
                           }`}
                         activeOpacity={0.85}
                         onPress={() =>
@@ -786,22 +783,20 @@ export default function WorkoutDayScreen() {
 
         {/* Sticky footer button — ONLY when all sets are done */}
         {allCompleted && (
-          <View className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#050816] via-[#050816]/80 to-transparent px-4 pb-6 pt-4">
+          <View className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#050816] via-[#050816]/80 to-transparent px-4 pb-6 pt-4">
             <TouchableOpacity
               className="pointer-events-auto h-12 flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
               activeOpacity={0.9}
               onPress={markAllCompleted}
-              disabled={isCompleting}
+              disabled={isCompleting || showCelebration} // Disable while celebrating
             >
               <Ionicons
                 name="checkmark-circle-outline"
                 size={18}
                 color="#050816"
               />
-              <Text className="ml-2 text-sm font-bold text-[#050816]">
-                {isCompleting
-                  ? "Finishing..."
-                  : "Mark workout completed"}
+              <Text className="ml-2 font-bold text-[#050816]">
+                {isCompleting ? "Wrapping up..." : "Complete Workout"}
               </Text>
             </TouchableOpacity>
           </View>

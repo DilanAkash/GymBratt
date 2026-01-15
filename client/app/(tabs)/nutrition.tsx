@@ -1,12 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import SuccessAnimation from "../../components/SuccessAnimation";
 
 const PRIMARY = "#0df20d";
 
 export default function NutritionScreen() {
   const router = useRouter();
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [isDayFollowed, setIsDayFollowed] = useState(false);
 
   // Dynamic-ready template data (later: Firestore)
   const today = {
@@ -57,8 +61,19 @@ export default function NutritionScreen() {
     });
   };
 
+  const handleMarkFollowed = () => {
+    setShowSuccess(true);
+    setIsDayFollowed(true);
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
+      <SuccessAnimation
+        visible={showSuccess}
+        message="Nutrition Goal Met!"
+        onFinish={() => setShowSuccess(false)}
+      />
+
       {/* Top App Bar */}
       <View className="border-b border-white/10 bg-[#050816]/80 px-4 pb-2 pt-3">
         <View className="flex-row items-center justify-between">
@@ -201,10 +216,22 @@ export default function NutritionScreen() {
 
         {/* Footer button – Mark Day as Followed */}
         <View className="absolute bottom-0 left-0 right-0 bg-[#050816]/90 px-4 pb-5 pt-3">
-          <TouchableOpacity className="h-14 w-full items-center justify-center rounded-xl bg-[rgb(57,255,20)]">
-            <Text className="text-base font-bold text-[#050816]">
-              Mark Day as Followed
-            </Text>
+          <TouchableOpacity
+            className={`h-14 w-full items-center justify-center rounded-xl ${isDayFollowed ? 'bg-[#1e293b]' : 'bg-[rgb(57,255,20)]'}`}
+            onPress={handleMarkFollowed}
+            disabled={isDayFollowed}
+            activeOpacity={0.8}
+          >
+            <View className="flex-row items-center gap-2">
+              <Ionicons
+                name={isDayFollowed ? "checkmark-circle" : "checkbox-outline"}
+                size={22}
+                color={isDayFollowed ? "#94a3b8" : "#050816"}
+              />
+              <Text className={`text-base font-bold ${isDayFollowed ? 'text-slate-400' : 'text-[#050816]'}`}>
+                {isDayFollowed ? "Day Completed" : "Mark Day as Followed"}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
