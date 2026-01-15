@@ -1,3 +1,4 @@
+// app/login.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -26,6 +27,8 @@ export default function LoginScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [stayLoggedIn, setStayLoggedIn] = useState(true);
+
   const handleLogin = async () => {
     const trimmedEmail = email.trim();
 
@@ -38,11 +41,45 @@ export default function LoginScreen() {
       setLoading(true);
       setErrorMessage(null);
 
-      // ✅ Real Firebase Auth login, but NO Firestore calls here
-      await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      // 1. Authenticate
+      const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      const user = userCredential.user;
 
-      // After login: go straight to Edit Profile (first-time setup style)
-      router.replace("/edit-profile");
+      // 2. Check if profile is complete (Optimistic with timeout/error handling)
+      // We assume complete if we can't check (offline), so user can enter app
+      let isProfileComplete = true;
+
+      try {
+        const { doc, getDoc } = await import("firebase/firestore");
+        const { db } = await import("../lib/firebase");
+
+        const userDocRef = doc(db, "users", user.uid);
+        // Race getDoc against a short timeout (e.g. 2s)
+        const userSnapRequest = getDoc(userDocRef);
+        const timeoutRequest = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 1000));
+
+        const userSnap: any = await Promise.race([userSnapRequest, timeoutRequest]);
+
+        if (userSnap.exists()) {
+          const data = userSnap.data();
+          // If vital fields are missing, then it is NOT complete
+          if (!data.fullName || !data.phone || !data.dob || !data.goal) {
+            isProfileComplete = false;
+          }
+        }
+      } catch (checkErr) {
+        console.log("Profile check skipped/failed (offline?):", checkErr);
+        // If offline, we proceed to dashboard to avoid blocking
+        isProfileComplete = true;
+      }
+
+      // 3. Navigate
+      if (isProfileComplete) {
+        router.replace("/(tabs)");
+      } else {
+        router.replace("/edit-profile");
+      }
+
     } catch (err: any) {
       console.log("Login error:", err);
 
@@ -155,8 +192,19 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            {/* Forgot password */}
-            <View className="w-full items-end py-2">
+            {/* Options: Stay Logged In & Forgot Password */}
+            <View className="flex-row items-center justify-between py-2">
+              <TouchableOpacity
+                className="flex-row items-center gap-2"
+                activeOpacity={0.8}
+                onPress={() => setStayLoggedIn(!stayLoggedIn)}
+              >
+                <View className={`h-5 w-5 items-center justify-center rounded-md border ${stayLoggedIn ? 'bg-[rgb(13,242,13)] border-[rgb(13,242,13)]' : 'border-slate-600 bg-transparent'}`}>
+                  {stayLoggedIn && <Ionicons name="checkmark" size={14} color="#050816" />}
+                </View>
+                <Text className="text-sm text-slate-300">Stay logged in</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => router.push("/forgot-password")}
@@ -170,11 +218,10 @@ export default function LoginScreen() {
             {/* Log In button */}
             <View className="w-full pt-2">
               <TouchableOpacity
-                className={`h-14 w-full items-center justify-center rounded-xl ${
-                  loading
-                    ? "bg-[rgb(13,242,13)]/70"
-                    : "bg-[rgb(13,242,13)]"
-                }`}
+                className={`h-14 w-full items-center justify-center rounded-xl ${loading
+                  ? "bg-[rgb(13,242,13)]/70"
+                  : "bg-[rgb(13,242,13)]"
+                  }`}
                 activeOpacity={0.9}
                 onPress={handleLogin}
                 disabled={loading}

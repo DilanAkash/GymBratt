@@ -2,19 +2,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useProgramStore } from "../lib/ProgramStoreContext";
 import type {
-    Program,
-    ProgramDay,
-    ProgramExercise,
-    ProgramSetSchema,
+  Program,
+  ProgramDay,
+  ProgramExercise,
+  ProgramSetSchema,
 } from "../lib/mockPrograms";
 
 type Params = {
@@ -98,6 +98,24 @@ function parseRestStringToSeconds(rest?: string): number | null {
   return value;
 }
 
+const adjustReps = (current: string, delta: number): string => {
+  // Try to find numbers
+  const rangeMatch = current.match(/^(\d+)[–-](\d+)(.*)/); // "8-12 reps"
+  if (rangeMatch) {
+    const start = parseInt(rangeMatch[1]) + delta;
+    const end = parseInt(rangeMatch[2]) + delta;
+    return `${Math.max(1, start)}–${Math.max(1, end)}${rangeMatch[3]}`;
+  }
+
+  const singleMatch = current.match(/^(\d+)(.*)/); // "10 reps"
+  if (singleMatch) {
+    const val = parseInt(singleMatch[1]) + delta;
+    return `${Math.max(1, val)}${singleMatch[2]}`;
+  }
+
+  return current;
+};
+
 export default function ProgramDayBuilderScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
@@ -162,9 +180,9 @@ export default function ProgramDayBuilderScreen() {
         {
           id: "s1",
           label: "Set 1",
-          targetReps: "8–12 reps",
-          rpe: "RPE 7–8",
-          rest: "Rest 90s",
+          targetReps: "10",
+          rpe: "RPE 8",
+          rest: "90s",
           restSeconds: 90,
         },
       ],
@@ -246,18 +264,18 @@ export default function ProgramDayBuilderScreen() {
 
         const newSet: ProgramSetSchema = last
           ? {
-              ...last,
-              id: `s${newIndex}`,
-              label: `Set ${newIndex}`,
-            }
+            ...last,
+            id: `s${newIndex}`,
+            label: `Set ${newIndex}`,
+          }
           : {
-              id: `s${newIndex}`,
-              label: `Set ${newIndex}`,
-              targetReps: "8–12 reps",
-              rpe: "RPE 7–8",
-              rest: "Rest 90s",
-              restSeconds: 90,
-            };
+            id: `s${newIndex}`,
+            label: `Set ${newIndex}`,
+            targetReps: "10",
+            rpe: "RPE 8",
+            rest: "90s",
+            restSeconds: 90,
+          };
 
         return {
           ...ex,
@@ -285,18 +303,18 @@ export default function ProgramDayBuilderScreen() {
       const updatedDays = program.days.map((day) =>
         day.id === draftDay.id
           ? {
-              ...draftDay,
-              exercises: draftDay.exercises.map((ex) => ({
-                ...ex,
-                sets: ex.sets.map((s) => ({
-                  ...s,
-                  restSeconds:
-                    s.restSeconds ??
-                    parseRestStringToSeconds(s.rest ?? undefined) ??
-                    60,
-                })),
+            ...draftDay,
+            exercises: draftDay.exercises.map((ex) => ({
+              ...ex,
+              sets: ex.sets.map((s) => ({
+                ...s,
+                restSeconds:
+                  s.restSeconds ??
+                  parseRestStringToSeconds(s.rest ?? undefined) ??
+                  60,
               })),
-            }
+            })),
+          }
           : day
       );
 
@@ -498,11 +516,10 @@ export default function ProgramDayBuilderScreen() {
                             handleRemoveSet(exercise.id, setIndex)
                           }
                           disabled={exercise.sets.length <= 1}
-                          className={`h-7 w-7 items-center justify-center rounded-full ${
-                            exercise.sets.length <= 1
-                              ? "bg-white/5"
-                              : "bg-white/10"
-                          }`}
+                          className={`h-7 w-7 items-center justify-center rounded-full ${exercise.sets.length <= 1
+                            ? "bg-white/5"
+                            : "bg-white/10"
+                            }`}
                         >
                           <Ionicons
                             name="remove"
@@ -516,143 +533,99 @@ export default function ProgramDayBuilderScreen() {
                         </TouchableOpacity>
                       </View>
 
-                      {/* Target reps */}
-                      <View className="mb-2">
+                      {/* RPE + Rest */}
+                      <View className="flex-row gap-3">
+                        {/* RPE */}
+                        <View className="flex-1">
+                          <Text className="pb-1 text-[11px] text-zinc-400">RPE</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
+                            <View className="flex-row rounded-lg border border-white/10 bg-black/40 p-1">
+                              {[6, 7, 8, 9, 10].map((val) => {
+                                const rpeStr = `RPE ${val}`;
+                                const isSelected = set.rpe?.includes(val.toString());
+                                return (
+                                  <TouchableOpacity
+                                    key={val}
+                                    onPress={() => handleUpdateSet(exercise.id, setIndex, { rpe: rpeStr })}
+                                    className={`h-7 w-7 items-center justify-center rounded-md ${isSelected ? 'bg-lime-400' : 'bg-transparent'}`}
+                                  >
+                                    <Text className={`text-xs ${isSelected ? 'font-bold text-black' : 'text-zinc-400'}`}>{val}</Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          </ScrollView>
+                        </View>
+
+                        {/* Rest */}
+                        <View className="flex-1">
+                          <Text className="pb-1 text-[11px] text-zinc-400">Rest (s)</Text>
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <View className="flex-row gap-1">
+                              {[30, 60, 90, 120, 180].map(val => {
+                                const isSelected = set.restSeconds === val;
+                                return (
+                                  <TouchableOpacity
+                                    key={val}
+                                    onPress={() => handleUpdateSet(exercise.id, setIndex, { rest: `Rest ${val}s`, restSeconds: val })}
+                                    className={`h-8 items-center justify-center rounded-lg border px-2 ${isSelected ? 'border-lime-400 bg-lime-400/10' : 'border-white/10 bg-black/40'}`}
+                                  >
+                                    <Text className={`text-xs ${isSelected ? 'text-lime-300' : 'text-zinc-400'}`}>{val}s</Text>
+                                  </TouchableOpacity>
+                                )
+                              })}
+                            </View>
+                          </ScrollView>
+                        </View>
+                      </View>
+
+                      {/* Reps Row */}
+                      <View className="mt-2">
                         <Text className="pb-1 text-[11px] text-zinc-400">
                           Target reps
                         </Text>
-                        <View className="mb-1 flex-row flex-wrap gap-1">
-                          {REP_PRESETS.map((preset) => (
-                            <TouchableOpacity
-                              key={preset}
-                              onPress={() =>
-                                handleUpdateSet(
-                                  exercise.id,
-                                  setIndex,
-                                  { targetReps: preset }
-                                )
-                              }
-                              className={`rounded-full border px-2 py-1 ${
-                                set.targetReps === preset
-                                  ? "border-lime-400 bg-lime-400/20"
-                                  : "border-white/10 bg-black/40"
-                              }`}
-                            >
-                              <Text className="text-[10px] text-slate-100">
-                                {preset}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                        <TextInput
-                          value={set.targetReps}
-                          onChangeText={(value) =>
-                            handleUpdateSet(exercise.id, setIndex, {
-                              targetReps: value,
-                            })
-                          }
-                          placeholder="e.g. 8–10 reps"
-                          placeholderTextColor="#6b7280"
-                          className="h-9 rounded-lg border border-white/15 bg-black/40 px-3 text-xs text-slate-100"
-                        />
-                      </View>
+                        <View className="flex-row items-center gap-2">
+                          <TouchableOpacity
+                            onPress={() => handleUpdateSet(exercise.id, setIndex, { targetReps: adjustReps(set.targetReps, -1) })}
+                            className="h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5"
+                          >
+                            <Ionicons name="remove" size={18} color="white" />
+                          </TouchableOpacity>
 
-                      {/* RPE + Rest */}
-                      <View className="flex-row gap-2">
-                        <View className="flex-1">
-                          <Text className="pb-1 text-[11px] text-zinc-400">
-                            RPE
-                          </Text>
-                          <View className="mb-1 flex-row flex-wrap gap-1">
-                            {RPE_PRESETS.map((preset) => (
+                          <TextInput
+                            value={set.targetReps}
+                            onChangeText={(value) =>
+                              handleUpdateSet(exercise.id, setIndex, {
+                                targetReps: value,
+                              })
+                            }
+                            placeholder="e.g. 8–10"
+                            placeholderTextColor="#6b7280"
+                            className="h-10 flex-1 rounded-xl border border-white/15 bg-black/40 px-3 text-center text-sm font-semibold text-slate-100"
+                          />
+
+                          <TouchableOpacity
+                            onPress={() => handleUpdateSet(exercise.id, setIndex, { targetReps: adjustReps(set.targetReps, 1) })}
+                            className="h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5"
+                          >
+                            <Ionicons name="add" size={18} color="white" />
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Presets Chips for Reps - simplified */}
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-2">
+                          <View className="flex-row gap-1">
+                            {["5", "8", "10", "12", "15", "8-12", "12-15"].map(p => (
                               <TouchableOpacity
-                                key={preset}
-                                onPress={() =>
-                                  handleUpdateSet(
-                                    exercise.id,
-                                    setIndex,
-                                    { rpe: preset }
-                                  )
-                                }
-                                className={`rounded-full border px-2 py-1 ${
-                                  set.rpe === preset
-                                    ? "border-lime-400 bg-lime-400/20"
-                                    : "border-white/10 bg-black/40"
-                                }`}
+                                key={p}
+                                onPress={() => handleUpdateSet(exercise.id, setIndex, { targetReps: p })}
+                                className="rounded-md border border-white/5 bg-white/5 px-2 py-1"
                               >
-                                <Text className="text-[10px] text-slate-100">
-                                  {preset}
-                                </Text>
+                                <Text className="text-[10px] text-zinc-400">{p}</Text>
                               </TouchableOpacity>
                             ))}
                           </View>
-                          <TextInput
-                            value={set.rpe ?? ""}
-                            onChangeText={(value) =>
-                              handleUpdateSet(exercise.id, setIndex, {
-                                rpe: value,
-                              })
-                            }
-                            placeholder="e.g. RPE 8"
-                            placeholderTextColor="#6b7280"
-                            className="h-9 rounded-lg border border-white/15 bg-black/40 px-3 text-xs text-slate-100"
-                          />
-                        </View>
-
-                        <View className="flex-1">
-                          <Text className="pb-1 text-[11px] text-zinc-400">
-                            Rest
-                          </Text>
-                          <View className="mb-1 flex-row flex-wrap gap-1">
-                            {REST_PRESETS.map((secs) => {
-                              const label = `${secs}s`;
-                              const currentSeconds =
-                                set.restSeconds ??
-                                parseRestStringToSeconds(set.rest ?? undefined);
-
-                              const selected = currentSeconds === secs;
-
-                              return (
-                                <TouchableOpacity
-                                  key={secs}
-                                  onPress={() =>
-                                    handleUpdateSet(
-                                      exercise.id,
-                                      setIndex,
-                                      {
-                                        rest: `Rest ${label}`,
-                                        restSeconds: secs,
-                                      }
-                                    )
-                                  }
-                                  className={`rounded-full border px-2 py-1 ${
-                                    selected
-                                      ? "border-lime-400 bg-lime-400/20"
-                                      : "border-white/10 bg-black/40"
-                                  }`}
-                                >
-                                  <Text className="text-[10px] text-slate-100">
-                                    {label}
-                                  </Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </View>
-                          <TextInput
-                            value={set.rest ?? ""}
-                            onChangeText={(value) =>
-                              handleUpdateSet(exercise.id, setIndex, {
-                                rest: value,
-                                restSeconds:
-                                  parseRestStringToSeconds(value) ??
-                                  set.restSeconds,
-                              })
-                            }
-                            placeholder="e.g. Rest 90s"
-                            placeholderTextColor="#6b7280"
-                            className="h-9 rounded-lg border border-white/15 bg-black/40 px-3 text-xs text-slate-100"
-                          />
-                        </View>
+                        </ScrollView>
                       </View>
                     </View>
                   ))}
@@ -719,11 +692,10 @@ export default function ProgramDayBuilderScreen() {
           <TouchableOpacity
             activeOpacity={0.9}
             disabled={isSaving}
-            className={`h-12 flex-row items-center justify-center rounded-xl ${
-              isSaving
-                ? "bg-lime-500/60"
-                : "bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
-            }`}
+            className={`h-12 flex-row items-center justify-center rounded-xl ${isSaving
+              ? "bg-lime-500/60"
+              : "bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
+              }`}
             onPress={handleSave}
           >
             <Text className="text-sm font-bold text-[#050816]">

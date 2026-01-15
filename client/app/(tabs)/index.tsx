@@ -6,6 +6,7 @@ import {
   useAttendance,
   type AttendanceEntry,
 } from "../../lib/AttendanceContext";
+import { useProgramStore } from "../../lib/ProgramStoreContext";
 import { useAppUser } from "../../lib/UserContext";
 
 const PRIMARY = "#0df20d";
@@ -66,6 +67,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAppUser();
   const { entries } = useAttendance();
+  const { programs, getNextWorkoutDay } = useProgramStore();
 
   const displayName = user.fullName || "Athlete";
   const gymName = user.gymName || "Your Gym";
@@ -97,16 +99,22 @@ export default function HomeScreen() {
     status: user.membershipStatus || "Active",
     statusColor: PRIMARY,
     memberName: displayName,
-    memberId: "FF-2049", // placeholder
+    memberId: user.uid ? `ID-${user.uid.substring(0, 6).toUpperCase()}` : "GUEST",
     expiresAt: "2025-12-31", // placeholder
   };
 
-  const todayWorkout = {
-    title: "Push Day – Hypertrophy",
-    durationMinutes: 60,
-    progress: 0.25, // later from logs
-    statusText: "Scheduled",
-  };
+  // Find active program (first one for now)
+  const activeProgram = programs[0];
+  const nextDay = activeProgram ? getNextWorkoutDay(activeProgram.id) : undefined;
+
+  const todayWorkout = nextDay ? {
+    title: nextDay.title,
+    durationMinutes: 60, // estimate
+    progress: 0,
+    statusText: nextDay.status === 'today' ? "Scheduled for today" : "Up next",
+    programId: activeProgram.id,
+    dayId: nextDay.id
+  } : null;
 
   const nutrition = {
     calories: 2200,
@@ -247,55 +255,78 @@ export default function HomeScreen() {
         </View>
 
         {/* ===== Today’s Workout ===== */}
-        <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-          <View className="mb-3 flex-row items-center justify-between">
+        {todayWorkout ? (
+          <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-5">
+            <View className="mb-3 flex-row items-center justify-between">
+              <View>
+                <Text className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  Today&apos;s Workout
+                </Text>
+                <Text className="mt-1 text-[15px] font-semibold text-slate-50">
+                  {todayWorkout.title}
+                </Text>
+              </View>
+
+              <View className="items-end">
+                <Text className="text-xs text-zinc-400">Estimated</Text>
+                <Text className="mt-0.5 text-sm font-semibold text-slate-50">
+                  {todayWorkout.durationMinutes} mins
+                </Text>
+              </View>
+            </View>
+
+            {/* Progress bar */}
+            <View className="mt-3">
+              <View className="mb-1 flex-row items-center justify-between">
+                <Text className="text-xs text-zinc-400">
+                  {todayWorkout.statusText}
+                </Text>
+                <Text className="text-xs font-medium text-[#0df20d]">
+                  {Math.round(todayWorkout.progress * 100)}% complete
+                </Text>
+              </View>
+
+              <View className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                <View
+                  className="h-1.5 rounded-full bg-[#0df20d]"
+                  style={{ width: `${todayWorkout.progress * 100}%` }}
+                />
+              </View>
+            </View>
+
+            {/* Start workout */}
+            <TouchableOpacity
+              className="mt-4 h-11 flex-row items-center justify-center gap-2 rounded-full bg-[#0df20d] shadow-lg shadow-[rgba(13,242,13,0.35)]"
+              onPress={() => router.push({
+                pathname: "/workout-day",
+                params: {
+                  programId: todayWorkout.programId,
+                  dayId: todayWorkout.dayId
+                }
+              })}
+            >
+              <Ionicons name="play" size={18} color="#050816" />
+              <Text className="text-[13px] font-bold text-[#050816]">
+                Start Workout
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-5 flex-row items-center justify-between">
             <View>
-              <Text className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                Today&apos;s Workout
-              </Text>
-              <Text className="mt-1 text-[15px] font-semibold text-slate-50">
-                {todayWorkout.title}
-              </Text>
+              <Text className="text-sm font-semibold text-slate-50">No workout scheduled</Text>
+              <Text className="text-xs text-zinc-400 mt-1">Enjoy your rest day!</Text>
             </View>
-
-            <View className="items-end">
-              <Text className="text-xs text-zinc-400">Estimated</Text>
-              <Text className="mt-0.5 text-sm font-semibold text-slate-50">
-                {todayWorkout.durationMinutes} mins
+            <TouchableOpacity
+              className="h-9 px-4 items-center justify-center rounded-full bg-white/10"
+              onPress={() => router.push("/workouts")}
+            >
+              <Text className="text-[11px] font-semibold text-slate-100">
+                Browse Plans
               </Text>
-            </View>
+            </TouchableOpacity>
           </View>
-
-          {/* Progress bar */}
-          <View className="mt-3">
-            <View className="mb-1 flex-row items-center justify-between">
-              <Text className="text-xs text-zinc-400">
-                {todayWorkout.statusText}
-              </Text>
-              <Text className="text-xs font-medium text-[#0df20d]">
-                {Math.round(todayWorkout.progress * 100)}% complete
-              </Text>
-            </View>
-
-            <View className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-              <View
-                className="h-1.5 rounded-full bg-[#0df20d]"
-                style={{ width: `${todayWorkout.progress * 100}%` }}
-              />
-            </View>
-          </View>
-
-          {/* Start workout */}
-          <TouchableOpacity
-            className="mt-4 h-11 flex-row items-center justify-center gap-2 rounded-full bg-[#0df20d] shadow-lg shadow-[rgba(13,242,13,0.35)]"
-            onPress={() => router.push("/workout-day")}
-          >
-            <Ionicons name="play" size={18} color="#050816" />
-            <Text className="text-[13px] font-bold text-[#050816]">
-              Start Workout
-            </Text>
-          </TouchableOpacity>
-        </View>
+        )}
 
         {/* ===== Today’s Nutrition ===== */}
         <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-5">

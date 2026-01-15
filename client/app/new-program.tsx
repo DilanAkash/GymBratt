@@ -146,16 +146,14 @@ export default function NewProgramScreen() {
                   <TouchableOpacity
                     key={goal}
                     onPress={() => setSelectedGoal(goal)}
-                    className={`rounded-full border px-3 py-1.5 ${
-                      selected
+                    className={`rounded-full border px-3 py-1.5 ${selected
                         ? "border-lime-400 bg-lime-400/20"
                         : "border-white/10 bg-white/5"
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`text-sm ${
-                        selected ? "text-lime-300" : "text-neutral-200"
-                      }`}
+                      className={`text-sm ${selected ? "text-lime-300" : "text-neutral-200"
+                        }`}
                     >
                       {goal}
                     </Text>
@@ -177,16 +175,14 @@ export default function NewProgramScreen() {
                   <TouchableOpacity
                     key={option}
                     onPress={() => setSelectedExperience(option)}
-                    className={`rounded-full border px-3 py-1.5 ${
-                      selected
+                    className={`rounded-full border px-3 py-1.5 ${selected
                         ? "border-lime-400 bg-lime-400/20"
                         : "border-white/10 bg-white/5"
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`text-sm ${
-                        selected ? "text-lime-300" : "text-neutral-200"
-                      }`}
+                      className={`text-sm ${selected ? "text-lime-300" : "text-neutral-200"
+                        }`}
                     >
                       {option}
                     </Text>
@@ -208,16 +204,14 @@ export default function NewProgramScreen() {
                   <TouchableOpacity
                     key={d}
                     onPress={() => setSelectedDays(d)}
-                    className={`h-9 min-w-[44px] items-center justify-center rounded-full border ${
-                      selected
+                    className={`h-9 min-w-[44px] items-center justify-center rounded-full border ${selected
                         ? "border-lime-400 bg-lime-400/20"
                         : "border-white/10 bg-white/5"
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`text-sm ${
-                        selected ? "text-lime-300" : "text-neutral-200"
-                      }`}
+                      className={`text-sm ${selected ? "text-lime-300" : "text-neutral-200"
+                        }`}
                     >
                       {d}
                     </Text>
@@ -235,6 +229,27 @@ export default function NewProgramScreen() {
             <Text className="pb-2 text-sm font-medium text-neutral-300">
               Duration (weeks)
             </Text>
+
+            <View className="mb-3 flex-row items-center gap-4">
+              <TouchableOpacity
+                onPress={() => setWeeks(Math.max(1, weeks - 1))}
+                className="h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5"
+              >
+                <Ionicons name="remove" size={20} color="white" />
+              </TouchableOpacity>
+
+              <View className="h-10 flex-1 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+                <Text className="text-lg font-bold text-white">{weeks}</Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setWeeks(weeks + 1)}
+                className="h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5"
+              >
+                <Ionicons name="add" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+
             <View className="flex-row flex-wrap gap-2">
               {WEEK_OPTIONS.map((w) => {
                 const selected = weeks === w;
@@ -242,16 +257,14 @@ export default function NewProgramScreen() {
                   <TouchableOpacity
                     key={w}
                     onPress={() => setWeeks(w)}
-                    className={`h-9 min-w-[52px] items-center justify-center rounded-full border ${
-                      selected
+                    className={`h-9 min-w-[52px] items-center justify-center rounded-full border ${selected
                         ? "border-lime-400 bg-lime-400/20"
                         : "border-white/10 bg-white/5"
-                    }`}
+                      }`}
                   >
                     <Text
-                      className={`text-sm ${
-                        selected ? "text-lime-300" : "text-neutral-200"
-                      }`}
+                      className={`text-sm ${selected ? "text-lime-300" : "text-neutral-200"
+                        }`}
                     >
                       {w}
                     </Text>
@@ -308,15 +321,14 @@ export default function NewProgramScreen() {
         <View className="border-t border-white/10 bg-[#050816]/95 px-4 pb-6 pt-4">
           <TouchableOpacity
             activeOpacity={0.9}
-            disabled={isSaving}
-            className={`mb-3 h-12 flex-row items-center justify-center rounded-xl ${
-              isSaving
-                ? "bg-lime-500/60"
+            disabled={isSaving || !name.trim() || !selectedGoal || !selectedDays}
+            className={`mb-3 h-12 flex-row items-center justify-center rounded-xl ${isSaving || !name.trim() || !selectedGoal || !selectedDays
+                ? "bg-white/10"
                 : "bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
-            }`}
+              }`}
             onPress={handleCreate}
           >
-            <Text className="text-sm font-bold text-[#050816]">
+            <Text className={`text-sm font-bold ${isSaving || !name.trim() || !selectedGoal || !selectedDays ? "text-zinc-500" : "text-[#050816]"}`}>
               {isSaving ? "Creating..." : "Next: Build program"}
             </Text>
           </TouchableOpacity>

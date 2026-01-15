@@ -1,6 +1,7 @@
 // lib/firebase.ts
+import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 import { FirebaseApp, getApp, getApps, initializeApp } from "firebase/app";
-import { Auth, getAuth } from "firebase/auth";
+import { Auth, getAuth, initializeAuth } from "firebase/auth";
 import { Firestore, getFirestore } from "firebase/firestore";
 import { FirebaseStorage, getStorage } from "firebase/storage";
 
@@ -16,14 +17,33 @@ const firebaseConfig = {
 
 // ✅ Initialize app safely (avoid double init in Expo)
 let app: FirebaseApp;
+let auth: Auth;
+
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
+
+  // Try to initialize with persistence safely
+  try {
+    // Check if we can use the React Native persistence
+    // This require might fail if the subpath isn't resolved, falling back to default
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getReactNativePersistence } = require("firebase/auth/react-native");
+
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+    });
+    console.log("Firebase Auth initialized with persistence");
+  } catch (e) {
+    console.warn("Firebase Auth persistence failed to load, falling back to memory:", e);
+    auth = getAuth(app);
+  }
 } else {
   app = getApp();
+  auth = getAuth(app);
 }
 
-// ✅ Simple Auth / Firestore / Storage setup
 export const firebaseApp = app;
-export const auth: Auth = getAuth(app);
+// @ts-ignore
+export { auth };
 export const db: Firestore = getFirestore(app);
 export const storage: FirebaseStorage = getStorage(app);

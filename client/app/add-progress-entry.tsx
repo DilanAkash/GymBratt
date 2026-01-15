@@ -1,21 +1,72 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { addDoc, collection } from "firebase/firestore";
+import { useState } from "react";
 import {
-    ScrollView,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { auth, db } from "../lib/firebase";
 
 const PRIMARY = "#0df20d";
 
 export default function AddProgressEntryScreen() {
   const router = useRouter();
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Later we'll use real dates + form state
-  const dateLabel = "Today • Oct 26, 2025";
+  // Form State
+  const [weight, setWeight] = useState("");
+  const [bodyFat, setBodyFat] = useState("");
+  const [chest, setChest] = useState("");
+  const [waist, setWaist] = useState("");
+  const [hips, setHips] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const handleSave = async () => {
+    if (!weight) {
+      Alert.alert("Missing Input", "Please enter at least your weight.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const userId = auth.currentUser?.uid || "mock-user-id";
+      const entry = {
+        userId,
+        date: Date.now(),
+        weight: parseFloat(weight) || 0,
+        bodyFat: parseFloat(bodyFat) || null,
+        measurements: {
+          chest: parseFloat(chest) || null,
+          waist: parseFloat(waist) || null,
+          hips: parseFloat(hips) || null,
+        },
+        notes: notes.trim(),
+      };
+
+      await addDoc(collection(db, "progress"), entry);
+
+      router.back();
+    } catch (error) {
+      Alert.alert("Error", "Failed to save progress entry.");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const dateLabel = new Date().toLocaleDateString(undefined, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -65,6 +116,8 @@ export default function AddProgressEntryScreen() {
                 </Text>
                 <View className="mt-1 flex-row items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2">
                   <TextInput
+                    value={weight}
+                    onChangeText={setWeight}
                     placeholder="75.2"
                     placeholderTextColor="#6b7280"
                     keyboardType="numeric"
@@ -83,6 +136,8 @@ export default function AddProgressEntryScreen() {
                 </Text>
                 <View className="mt-1 flex-row items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2">
                   <TextInput
+                    value={bodyFat}
+                    onChangeText={setBodyFat}
                     placeholder="18.5"
                     placeholderTextColor="#6b7280"
                     keyboardType="numeric"
@@ -109,6 +164,8 @@ export default function AddProgressEntryScreen() {
               </Text>
               <View className="mt-1 flex-row items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2">
                 <TextInput
+                  value={chest}
+                  onChangeText={setChest}
                   placeholder="102"
                   placeholderTextColor="#6b7280"
                   keyboardType="numeric"
@@ -125,6 +182,8 @@ export default function AddProgressEntryScreen() {
               </Text>
               <View className="mt-1 flex-row items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2">
                 <TextInput
+                  value={waist}
+                  onChangeText={setWaist}
                   placeholder="85"
                   placeholderTextColor="#6b7280"
                   keyboardType="numeric"
@@ -141,6 +200,8 @@ export default function AddProgressEntryScreen() {
               </Text>
               <View className="mt-1 flex-row items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2">
                 <TextInput
+                  value={hips}
+                  onChangeText={setHips}
                   placeholder="95"
                   placeholderTextColor="#6b7280"
                   keyboardType="numeric"
@@ -187,6 +248,8 @@ export default function AddProgressEntryScreen() {
               Notes
             </Text>
             <TextInput
+              value={notes}
+              onChangeText={setNotes}
               placeholder="How are you feeling today? Energy, sleep, pumps..."
               placeholderTextColor="#6b7280"
               multiline
@@ -202,15 +265,19 @@ export default function AddProgressEntryScreen() {
           <TouchableOpacity
             className="h-14 w-full flex-row items-center justify-center rounded-xl bg-[rgb(13,242,13)]"
             activeOpacity={0.9}
-            onPress={() => {
-              // Later: save to Firestore then go back
-              router.back();
-            }}
+            onPress={handleSave}
+            disabled={isSaving}
           >
-            <Ionicons name="checkmark-circle" size={20} color="#050816" />
-            <Text className="ml-2 text-base font-bold text-[#050816]">
-              Save entry
-            </Text>
+            {isSaving ? (
+              <ActivityIndicator color="#050816" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={20} color="#050816" />
+                <Text className="ml-2 text-base font-bold text-[#050816]">
+                  Save entry
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>

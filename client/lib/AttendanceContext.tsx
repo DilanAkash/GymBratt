@@ -1,20 +1,23 @@
 // lib/AttendanceContext.tsx
+import { addDoc, collection } from "firebase/firestore";
 import React, {
-    createContext,
-    useContext,
-    useState,
-    type ReactNode,
+  createContext,
+  useContext,
+  useState,
+  type ReactNode,
 } from "react";
+import { auth, db } from "./firebase";
 
 export interface AttendanceEntry {
   id: string;
   timestamp: number; // ms since epoch
   gymId: string;
+  userId?: string;
 }
 
 type AttendanceContextValue = {
   entries: AttendanceEntry[];
-  addCheckIn: (params: { gymId: string }) => void;
+  addCheckIn: (params: { gymId: string }) => Promise<void>;
 };
 
 const AttendanceContext = createContext<
@@ -28,18 +31,34 @@ export const AttendanceProvider = ({
 }) => {
   const [entries, setEntries] = useState<AttendanceEntry[]>([]);
 
-  const addCheckIn = ({ gymId }: { gymId: string }) => {
+  const addCheckIn = async ({ gymId }: { gymId: string }) => {
     const now = Date.now();
-    const id = now.toString();
+    const userId = auth.currentUser?.uid || "mock-user-id";
 
-    setEntries((prev) => [
-      ...prev,
-      {
-        id,
+    try {
+      // Optimistic update
+      const tempId = now.toString();
+      const newEntry: AttendanceEntry = {
+        id: tempId,
         timestamp: now,
         gymId,
-      },
-    ]);
+        userId,
+      };
+      setEntries((prev) => [...prev, newEntry]);
+
+      // Write to Firestore
+      await addDoc(collection(db, "attendance"), {
+        gymId,
+        userId,
+        timestamp: now,
+        deviceCheckIn: true,
+      });
+
+    } catch (error) {
+      console.error("Error logging attendance:", error);
+      // revert optimistic? For now just log error.
+      throw error;
+    }
   };
 
   return (

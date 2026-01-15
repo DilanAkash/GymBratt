@@ -14,19 +14,37 @@ import { useProgramStore } from "../../lib/ProgramStoreContext";
 type ProgramCardProps = {
   program: Program;
   onPress: () => void;
-  onDelete?: () => void;
+  onReferenceAction?: (action: 'edit' | 'delete') => void;
 };
 
-function ProgramCard({ program, onPress, onDelete }: ProgramCardProps) {
+function ProgramCard({ program, onPress, onReferenceAction }: ProgramCardProps) {
   const completion =
     program.progress.totalWorkouts > 0
       ? program.progress.completedWorkouts /
-        program.progress.totalWorkouts
+      program.progress.totalWorkouts
       : 0;
 
   const percentage = Math.round(completion * 100);
   const sourceLabel =
     program.source === "coach" ? "Coach program" : "My program";
+
+  const handleMenuPress = () => {
+    if (!onReferenceAction) return;
+
+    Alert.alert(
+      program.name,
+      "Choose an action",
+      [
+        { text: "Edit Program", onPress: () => onReferenceAction('edit') },
+        {
+          text: "Delete Program",
+          style: "destructive",
+          onPress: () => onReferenceAction('delete')
+        },
+        { text: "Cancel", style: "cancel" }
+      ]
+    );
+  };
 
   return (
     <View className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4">
@@ -84,15 +102,16 @@ function ProgramCard({ program, onPress, onDelete }: ProgramCardProps) {
             </Text>
           </View>
 
-          {onDelete && (
+          {onReferenceAction && (
             <TouchableOpacity
-              onPress={onDelete}
+              onPress={handleMenuPress}
               className="mt-3 h-8 w-8 items-center justify-center rounded-full bg-white/10"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons
-                name="trash-outline"
-                size={16}
-                color="#fca5a5"
+                name="ellipsis-horizontal"
+                size={18}
+                color="#cbd5e1"
               />
             </TouchableOpacity>
           )}
@@ -117,19 +136,26 @@ export default function WorkoutsScreen() {
   const coachPrograms = programs.filter((p) => p.source === "coach");
   const myPrograms = programs.filter((p) => p.source === "user");
 
-  const confirmDeleteProgram = (program: Program) => {
-    Alert.alert(
-      "Delete program",
-      `Are you sure you want to delete "${program.name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteProgram(program.id),
-        },
-      ]
-    );
+  const handleAction = (program: Program, action: 'edit' | 'delete') => {
+    if (action === 'edit') {
+      router.push({
+        pathname: "/new-program-builder",
+        params: { programId: program.id },
+      });
+    } else if (action === 'delete') {
+      Alert.alert(
+        "Delete program",
+        `Are you sure you want to delete "${program.name}"?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => deleteProgram(program.id),
+          },
+        ]
+      );
+    }
   };
 
   return (
@@ -215,7 +241,7 @@ export default function WorkoutsScreen() {
                     params: { programId: program.id },
                   })
                 }
-                onDelete={() => confirmDeleteProgram(program)}
+                onReferenceAction={(action) => handleAction(program, action)}
               />
             ))
           )}

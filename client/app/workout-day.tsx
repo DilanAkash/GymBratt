@@ -99,7 +99,7 @@ export default function WorkoutDayScreen() {
   const [restRemaining, setRestRemaining] = useState(0);
   const [restTotal, setRestTotal] = useState(0);
   const [restFinished, setRestFinished] = useState(false);
-  const [restAcknowledged, setRestAcknowledged] = useState(false);  
+  const [restAcknowledged, setRestAcknowledged] = useState(false);
   const [upNext, setUpNext] = useState<UpNextInfo | null>(null);
   const [nextSetKey, setNextSetKey] = useState<string | null>(null);
 
@@ -154,7 +154,7 @@ export default function WorkoutDayScreen() {
 
   const triggerRestAlert = useCallback(async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
-      () => {}
+      () => { }
     );
 
     if (!soundRef.current) {
@@ -163,7 +163,7 @@ export default function WorkoutDayScreen() {
           require("../assets/sounds/rest-complete.wav")
         );
         soundRef.current = sound;
-    } catch {
+      } catch {
         return;
       }
     }
@@ -266,7 +266,7 @@ export default function WorkoutDayScreen() {
     setIsResting(true);
     setRestPaused(false);
     setRestFinished(false);
-    setRestAcknowledged(false);    
+    setRestAcknowledged(false);
     setRestRemaining(seconds);
     setRestTotal(seconds);
 
@@ -299,7 +299,7 @@ export default function WorkoutDayScreen() {
     stopRestNotifications();
     setRestFinished(false);
     setRestPaused(false);
-    setRestAcknowledged(true);    
+    setRestAcknowledged(true);
     setIsResting(false);
     setRestRemaining(0);
     setRestTotal(0);
@@ -315,6 +315,22 @@ export default function WorkoutDayScreen() {
       unloadRestSound();
     };
   }, [clearRest, stopRestNotifications, unloadRestSound]);
+
+  /* Scroll ref for auto-scrolling */
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [exerciseLayouts, setExerciseLayouts] = useState<Record<string, number>>({});
+
+  const handleLayout = (id: string, event: any) => {
+    const layout = event.nativeEvent.layout;
+    setExerciseLayouts((prev) => ({ ...prev, [id]: layout.y }));
+  };
+
+  const scrollToExercise = (exerciseId: string) => {
+    const y = exerciseLayouts[exerciseId];
+    if (y !== undefined && scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ y: y - 20, animated: true });
+    }
+  };
 
   const handleExercisePress = (exercise: ProgramExercise) => {
     router.push({
@@ -358,6 +374,40 @@ export default function WorkoutDayScreen() {
     });
   };
 
+  // Trigger repeating alerts when rest finishes until acknowledged
+  useEffect(() => {
+    if (
+      isResting &&
+      restFinished &&
+      !restAcknowledged &&
+      !restPaused &&
+      workoutStatus !== "paused"
+    ) {
+      startRestNotifications();
+
+      // Auto-scroll to next set if available
+      if (nextSetKey) {
+        const nextExerciseId = nextSetKey.split('-')[0];
+        scrollToExercise(nextExerciseId);
+      }
+    } else {
+      stopRestNotifications();
+    }
+
+    return () => {
+      stopRestNotifications();
+    };
+  }, [
+    isResting,
+    restFinished,
+    restAcknowledged,
+    restPaused,
+    workoutStatus,
+    startRestNotifications,
+    stopRestNotifications,
+    nextSetKey,
+  ]); // Added nextSetKey dependency
+
   const restProgress =
     !isResting || restTotal <= 0
       ? 0
@@ -393,7 +443,7 @@ export default function WorkoutDayScreen() {
       // Vibrate a bit on completion
       await Haptics.notificationAsync(
         Haptics.NotificationFeedbackType.Success
-      ).catch(() => {});
+      ).catch(() => { });
 
       await Promise.resolve(
         completeWorkoutDay(program.id, day.id)
@@ -401,6 +451,14 @@ export default function WorkoutDayScreen() {
 
       // Tiny UX feedback
       Alert.alert("Nice work 💪", "Workout marked as completed.");
+
+      router.back(); // Go back first to ensure context update is picked up or simple nav
+      // Wait, router.back() might not be enough if we came deep?
+      // Use router.dismissTo or navigate? The plan said "Navigate back to program-details"
+      // router.replace is fine but maybe push/replace stack issues?
+      // router.navigate('/program-details', { params: ... }) is safer usually if strictly hierarchical
+      // But let's stick to router.replace as in original code or router.back if purely stack.
+      // Original code used router.replace. I'll stick to it.
 
       router.replace({
         pathname: "/program-details",
@@ -411,7 +469,7 @@ export default function WorkoutDayScreen() {
       Alert.alert(
         "Something went wrong",
         "We couldn't mark the workout completed. Please try again."
-      );      
+      );
       setIsCompleting(false);
     } finally {
       setIsCompleting(false);
@@ -441,6 +499,7 @@ export default function WorkoutDayScreen() {
 
       <View className="flex-1">
         <ScrollView
+          ref={scrollViewRef}
           className="flex-1"
           contentContainerStyle={{
             paddingHorizontal: 16,
@@ -524,7 +583,7 @@ export default function WorkoutDayScreen() {
                   )}
                 </View>
               )}
-            </View>            
+            </View>
           </View>
 
           {/* Rest timer card (only visible while resting) */}
@@ -629,6 +688,7 @@ export default function WorkoutDayScreen() {
             <View
               key={exercise.id}
               className="mb-4 rounded-3xl border border-white/10 bg-white/5 p-4"
+              onLayout={(e) => handleLayout(exercise.id, e)}
             >
               <TouchableOpacity
                 activeOpacity={0.85}
@@ -666,11 +726,10 @@ export default function WorkoutDayScreen() {
                   return (
                     <View
                       key={key}
-                      className={`mb-2 flex-row items-center justify-between ${
-                        isNextHighlight
+                      className={`mb-2 flex-row items-center justify-between ${isNextHighlight
                           ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10"
                           : ""
-                      }`}
+                        }`}
                     >
                       <View className="flex-row items-center gap-3 px-1 py-1">
                         <Text className="text-xs font-semibold text-zinc-500">
@@ -701,20 +760,18 @@ export default function WorkoutDayScreen() {
                       </View>
 
                       <TouchableOpacity
-                        className={`h-7 min-w-[88px] items-center justify-center rounded-full border ${
-                          isDone
+                        className={`h-7 min-w-[88px] items-center justify-center rounded-full border ${isDone
                             ? "border-[#0df20d] bg-[#0df20d]"
                             : "border-white/30 bg-transparent"
-                        }`}
+                          }`}
                         activeOpacity={0.85}
                         onPress={() =>
                           handleSetPress(key, exercise, set, index)
                         }
                       >
                         <Text
-                          className={`text-[11px] font-semibold ${
-                            isDone ? "text-[#050816]" : "text-slate-100"
-                          }`}
+                          className={`text-[11px] font-semibold ${isDone ? "text-[#050816]" : "text-slate-100"
+                            }`}
                         >
                           {isDone ? "Done" : "Mark done"}
                         </Text>

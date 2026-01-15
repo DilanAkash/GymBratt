@@ -31,7 +31,7 @@ function groupDaysByWeek(program: Program): [number, ProgramDay[]][] {
 export default function ProgramDetailsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<ProgramDetailsParams>();
-  const { programs } = useProgramStore();
+  const { programs, getNextWorkoutDay, deleteProgram } = useProgramStore();
 
   const program =
     (params.programId &&
@@ -43,7 +43,7 @@ export default function ProgramDetailsScreen() {
   const completion =
     program.progress.totalWorkouts > 0
       ? program.progress.completedWorkouts /
-        program.progress.totalWorkouts
+      program.progress.totalWorkouts
       : 0;
 
   const completionPercent = Math.round(completion * 100);
@@ -83,15 +83,19 @@ export default function ProgramDetailsScreen() {
       return;
     }
 
-    const todayDay =
-      program.days.find((d) => d.status === "today") ||
-      program.days[0];
+    const nextDay = getNextWorkoutDay(program.id);
+
+    if (!nextDay) {
+      // Fallback or completed
+      Alert.alert("Program Completed", "You have finished all workouts for this program!");
+      return;
+    }
 
     router.push({
       pathname: "/workout-day",
       params: {
         programId: program.id,
-        dayId: todayDay.id,
+        dayId: nextDay.id,
       },
     });
   };
@@ -110,6 +114,27 @@ export default function ProgramDetailsScreen() {
     });
   };
 
+  const handleDeleteProgram = () => {
+    Alert.alert(
+      "Delete Program",
+      `Are you sure you want to delete "${program.name}"? This cannot be undone.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteProgram(program.id);
+            router.back();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
       {/* Header */}
@@ -126,14 +151,23 @@ export default function ProgramDetailsScreen() {
             Program details
           </Text>
 
-          <TouchableOpacity
-            onPress={handleEditProgram}
-            className="h-9 items-center justify-center rounded-full bg-white/10 px-3"
-          >
-            <Text className="text-[11px] font-semibold text-slate-100">
-              Edit
-            </Text>
-          </TouchableOpacity>
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              onPress={handleDeleteProgram}
+              className="h-9 w-9 items-center justify-center rounded-full bg-white/10"
+            >
+              <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={handleEditProgram}
+              className="h-9 items-center justify-center rounded-full bg-white/10 px-3"
+            >
+              <Text className="text-[11px] font-semibold text-slate-100">
+                Edit
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 

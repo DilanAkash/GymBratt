@@ -9,7 +9,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { doc, setDoc } from "firebase/firestore";
 import { useAppUser } from "../lib/UserContext";
+import { db } from "../lib/firebase";
 
 const PRIMARY = "#0df20d";
 
@@ -19,31 +21,56 @@ export default function EditProfileScreen() {
 
   const [fullName, setFullName] = useState(user.fullName || "");
   const [email, setEmail] = useState(user.email || "");
-  const [phone, setPhone] = useState("");
-  const [dob, setDob] = useState("");
-  const [goal, setGoal] = useState("");
+  const [phone, setPhone] = useState(user.phone || "");
+  const [dob, setDob] = useState(user.dob || "");
+  const [goal, setGoal] = useState(user.goal || "");
 
   const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaving(true);
-
     const trimmedName = fullName.trim();
     const trimmedEmail = email.trim();
 
-    // Update global user context (for this session)
+    // 1. Optimistic Update immediately
     setUser({
-      fullName: trimmedName || "Athlete",
-      email: trimmedEmail || "member@example.com",
-      gymName: user.gymName || "Your Gym",
-      membershipStatus: user.membershipStatus || "Active",
-      membershipLevel: user.membershipLevel || "Standard · 3 days / week",
+      ...user,
+      fullName: trimmedName || user.fullName,
+      email: trimmedEmail || user.email,
+      phone: phone.trim(),
+      dob: dob.trim(),
+      goal: goal.trim(),
     });
 
-    // Small delay to make button feedback feel real
+    // 2. Save to Firestore with detailed logging
+    // 2. Save to Firestore
+    if (user.uid) {
+      const userRef = doc(db, "users", user.uid);
+      const dataToSave = {
+        fullName: trimmedName,
+        email: trimmedEmail,
+        phone: phone.trim(),
+        dob: dob.trim(),
+        goal: goal.trim(),
+      };
+
+      try {
+        await setDoc(userRef, dataToSave, { merge: true });
+      } catch (err) {
+        console.error("Save failed:", err);
+      }
+    }
+
+    // 3. Navigate back smoothly
     setTimeout(() => {
       setSaving(false);
-      router.replace("/(tabs)");
+      // If we came from login (can't go back usually), go to dashboard
+      // If we came from profile (can go back), go back
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)");
+      }
     }, 500);
   };
 
@@ -56,7 +83,7 @@ export default function EditProfileScreen() {
             className="h-10 w-10 items-center justify-center rounded-full bg-white/10"
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={20} color="#ffffff" />
+            <Ionicons name="close" size={20} color="#ffffff" />
           </TouchableOpacity>
 
           <Text className="flex-1 px-2 text-center text-lg font-bold text-white">
@@ -142,12 +169,16 @@ export default function EditProfileScreen() {
             <Text className="text-xs font-medium uppercase tracking-wide text-slate-400">
               Date of birth
             </Text>
-            <TouchableOpacity className="mt-1 h-11 flex-row items-center justify-between rounded-xl bg-slate-900/80 px-3">
-              <Text className="text-sm text-slate-100">
-                {dob || "YYYY-MM-DD"}
-              </Text>
+            <View className="mt-1 h-11 flex-row items-center rounded-xl bg-slate-900/80 px-3">
+              <TextInput
+                value={dob}
+                onChangeText={setDob}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#6b7280"
+                className="flex-1 text-sm text-slate-100"
+              />
               <Ionicons name="calendar-outline" size={18} color="#9ca3af" />
-            </TouchableOpacity>
+            </View>
           </View>
 
           {/* Goal */}
@@ -155,12 +186,16 @@ export default function EditProfileScreen() {
             <Text className="text-xs font-medium uppercase tracking-wide text-slate-400">
               Main goal
             </Text>
-            <TouchableOpacity className="mt-1 h-11 flex-row items-center justify-between rounded-xl bg-slate-900/80 px-3">
-              <Text className="text-sm text-slate-100">
-                {goal || "Build muscle & strength"}
-              </Text>
-              <Ionicons name="chevron-down" size={18} color="#9ca3af" />
-            </TouchableOpacity>
+            <View className="mt-1 h-11 flex-row items-center rounded-xl bg-slate-900/80 px-3">
+              <TextInput
+                value={goal}
+                onChangeText={setGoal}
+                placeholder="E.g. Build muscle & strength"
+                placeholderTextColor="#6b7280"
+                className="flex-1 text-sm text-slate-100"
+              />
+              <Ionicons name="create-outline" size={18} color="#9ca3af" />
+            </View>
           </View>
         </View>
 

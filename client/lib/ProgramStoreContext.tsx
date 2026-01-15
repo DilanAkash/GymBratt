@@ -1,14 +1,14 @@
 import React, {
-    createContext,
-    useContext,
-    useState,
-    type ReactNode,
+  createContext,
+  useContext,
+  useState,
+  type ReactNode,
 } from "react";
 import {
-    MOCK_PROGRAMS,
-    type DayStatus,
-    type Program,
-    type ProgramDay
+  MOCK_PROGRAMS,
+  type DayStatus,
+  type Program,
+  type ProgramDay
 } from "./mockPrograms";
 
 export type AddUserProgramInput = {
@@ -24,8 +24,10 @@ type ProgramStoreValue = {
   programs: Program[];
   addUserProgram: (input: AddUserProgramInput) => Program;
   updateProgramDays: (programId: string, days: ProgramDay[]) => void;
+  updateProgram: (programId: string, updates: Partial<Program>) => void;
   deleteProgram: (programId: string) => void;
   completeWorkoutDay: (programId: string, dayId: string) => void;
+  getNextWorkoutDay: (programId: string) => ProgramDay | undefined;
 };
 
 const ProgramStoreContext = createContext<ProgramStoreValue | undefined>(
@@ -86,7 +88,7 @@ export const ProgramStoreProvider = ({
         const totalWorkouts =
           days.length > 0
             ? days.length *
-              Math.max(1, Math.round(p.durationWeeks / weeksCount))
+            Math.max(1, Math.round(p.durationWeeks / weeksCount))
             : p.progress.totalWorkouts;
 
         return {
@@ -108,6 +110,32 @@ export const ProgramStoreProvider = ({
         (p) => !(p.id === programId && p.source === "user")
       )
     );
+  };
+
+  const updateProgram = (programId: string, updates: Partial<Program>) => {
+    setPrograms((prev) =>
+      prev.map((p) => (p.id === programId ? { ...p, ...updates } : p))
+    );
+  };
+
+  const getNextWorkoutDay = (programId: string): ProgramDay | undefined => {
+    const program = programs.find((p) => p.id === programId);
+    if (!program) return undefined;
+
+    // 1. Try to find "today"
+    const today = program.days.find((d) => d.status === "today");
+    if (today) return today;
+
+    // 2. Try to find first "upcoming"
+    const upcoming = program.days.find((d) => d.status === "upcoming");
+    if (upcoming) return upcoming;
+
+    // 3. Fallback to first day if none completed
+    if (program.progress.completedWorkouts === 0 && program.days.length > 0) {
+      return program.days[0];
+    }
+
+    return undefined;
   };
 
   const completeWorkoutDay = (programId: string, dayId: string) => {
@@ -132,7 +160,7 @@ export const ProgramStoreProvider = ({
         );
 
         let completedWorkouts = p.progress.completedWorkouts;
-        let totalWorkouts =
+        const totalWorkouts =
           p.progress.totalWorkouts || updatedDays.length || 1;
 
         if (!alreadyCompleted) {
@@ -143,21 +171,39 @@ export const ProgramStoreProvider = ({
         }
 
         // Find next upcoming day to mark as "today"
-        const nextUpcoming = updatedDays.find(
-          (d) => d.status === "upcoming"
-        );
+        // If we just finished a day, find the NEXT one in the list
+        const currentDayIndex = updatedDays.findIndex((d) => d.id === dayId);
+        let nextDayIndex = -1;
 
-        const finalDays: ProgramDay[] = nextUpcoming
-          ? updatedDays.map(
-              (d): ProgramDay =>
-                d.id === nextUpcoming.id
-                  ? {
-                      ...d,
-                      status: "today" as DayStatus,
-                    }
-                  : d
-            )
-          : updatedDays;
+        // Look for the next non-completed day
+        for (let i = currentDayIndex + 1; i < updatedDays.length; i++) {
+          if (updatedDays[i].status !== 'completed') {
+            nextDayIndex = i;
+            break;
+          }
+        }
+        // If not found, circle back (or maybe just don't set a today if all done)
+        if (nextDayIndex === -1 && completedWorkouts < totalWorkouts) {
+          // Try from start
+          nextDayIndex = updatedDays.findIndex(d => d.status !== 'completed');
+        }
+
+        const finalDays: ProgramDay[] = updatedDays.map((d, idx) => {
+          // Unset previous todays? Or just ensure only one?
+          // For simplicity, let's just set the identified next day to "today"
+          // and ensure the completed one is "completed" (already done above)
+          // also we might want to set others to 'upcoming' if they were 'today' but skipped?
+
+          if (idx === nextDayIndex) {
+            return { ...d, status: 'today' as DayStatus };
+          }
+          // If it was 'today' but we moved past it, it should probably stay 'completed' or 'skipped' (but we don't have skipped yet)
+          // For now, if it's not the target day and not the next day, leave it alone unless it was 'today' and not completed?
+          if (d.status === 'today' && d.id !== dayId && idx !== nextDayIndex) {
+            return { ...d, status: 'upcoming' as DayStatus };
+          }
+          return d;
+        });
 
         return {
           ...p,
@@ -178,8 +224,10 @@ export const ProgramStoreProvider = ({
         programs,
         addUserProgram,
         updateProgramDays,
+        updateProgram,
         deleteProgram,
         completeWorkoutDay,
+        getNextWorkoutDay,
       }}
     >
       {children}
