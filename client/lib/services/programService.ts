@@ -12,7 +12,8 @@ import {
     orderBy,
     limit,
     onSnapshot,
-    addDoc
+    addDoc,
+    where
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "../firebase";
@@ -133,5 +134,24 @@ export const programService = {
             console.error("Error uploading photo:", error);
             throw error;
         }
+    },
+
+    // Nutrition
+    logMeal: async (userId: string, meal: any): Promise<void> => {
+        const mealsRef = collection(db, "users", userId, "mealLogs");
+        await addDoc(mealsRef, sanitize(meal));
+    },
+
+    getDailyNutrition: async (userId: string, dateStart: number, dateEnd: number): Promise<any[]> => {
+        const mealsRef = collection(db, "users", userId, "mealLogs");
+        // Simple query for range
+        const q = query(
+            mealsRef,
+            where("date", ">=", dateStart),
+            where("date", "<=", dateEnd),
+            orderBy("date", "desc")
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
     }
 };

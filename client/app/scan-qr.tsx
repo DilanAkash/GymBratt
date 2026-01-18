@@ -11,18 +11,25 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAttendance } from "../lib/AttendanceContext";
+import { useAppUser } from "../lib/UserContext";
 
 export default function ScanQrScreen() {
   const router = useRouter();
   const { addCheckIn } = useAttendance();
+  const { user, updateGym } = useAppUser();
   const [permission, requestPermission] = useCameraPermissions();
 
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [checkInInfo, setCheckInInfo] = useState<{
-    gymName: string;
-    gymId: string;
+  const [resultInfo, setResultInfo] = useState<{
+    success: boolean;
+    title: string;
+    message: string;
   } | null>(null);
+
+  // If user has no gymId, scanning is for JOINING.
+  // If user has gymId, scanning is for CHECK-IN.
+  const mode = user?.gymId ? "check-in" : "join";
 
   const handleBarCodeScanned = async ({ type, data }: { type: string; data: string }) => {
     if (scanned || processing) return;
@@ -30,39 +37,55 @@ export default function ScanQrScreen() {
     setProcessing(true);
 
     try {
-      // Assuming data is just the gymId or a JSON.
-      // For simple MVP, assume data is "gymId" or "json"
-      // Let's assume it's simply the gym ID string for now, or we can try to parse JSON
+      // Parse QR
       let gymId = data;
-      let gymName = "Unknown Gym";
+      let gymName = "Partner Gym";
 
       try {
         const parsed = JSON.parse(data);
         if (parsed.gymId) {
           gymId = parsed.gymId;
-          gymName = parsed.gymName || "Gym";
+          gymName = parsed.gymName || "Partner Gym";
         }
       } catch (e) {
-        // Not JSON, treat as raw ID
+        // Not JSON
       }
 
-      // Just use a mock name lookup if we only have ID
-      if (gymName === "Unknown Gym" && gymId.includes("apex")) {
-        gymName = "Apex Gym";
+      if (mode === "join") {
+        await updateGym(gymId, gymName);
+        setResultInfo({
+          success: true,
+          title: "Membership Activated",
+          message: `You have successfully joined ${gymName}. Welcome!`
+        });
+      } else {
+        // Check In Mode
+        if (user.gymId && gymId !== user.gymId) {
+          // Guest check-in or error? For now, lenient check-in or specific error.
+          // Let's assume error for now to enforce "My Gym".
+          throw new Error(`This QR code is for ${gymName}, but you are a member of ${user.gymName}.`);
+        }
+        await addCheckIn({ gymId });
+        setResultInfo({
+          success: true,
+          title: "Check-in Recorded",
+          message: `Welcome to ${gymName}. Your visit is logged.`
+        });
       }
 
-      await addCheckIn({ gymId });
-      setCheckInInfo({ gymId, gymName });
-    } catch (error) {
-      Alert.alert("Check-in Failed", "Could not verify scanned code.");
-      setScanned(false);
+    } catch (error: any) {
+      Alert.alert("Scan Failed", error.message || "Could not verify scanned code.");
+      setResultInfo({
+        success: false,
+        title: "Scan Failed",
+        message: error.message || "Please try again."
+      });
     } finally {
       setProcessing(false);
     }
   };
 
-  const handleManualCheckIn = async () => {
-    // 🧪 Fallback/Template mode
+  const handleManualAction = async () => {
     if (scanned || processing) return;
     setScanned(true);
     setProcessing(true);
@@ -71,8 +94,23 @@ export default function ScanQrScreen() {
     setTimeout(async () => {
       try {
         const gymId = "apex-gym-01";
-        await addCheckIn({ gymId });
-        setCheckInInfo({ gymId, gymName: "Apex Gym" });
+        const gymName = "Apex Gym";
+
+        if (mode === "join") {
+          await updateGym(gymId, gymName);
+          setResultInfo({
+            success: true,
+            title: "Membership Activated",
+            message: `You have successfully joined ${gymName}. Welcome!`
+          });
+        } else {
+          await addCheckIn({ gymId });
+          setResultInfo({
+            success: true,
+            title: "Check-in Recorded",
+            message: `Welcome to ${gymName}. Your visit is logged.`
+          });
+        }
       } finally {
         setProcessing(false);
       }
@@ -81,7 +119,7 @@ export default function ScanQrScreen() {
 
   const handleReset = () => {
     setScanned(false);
-    setCheckInInfo(null);
+    setResultInfo(null);
   };
 
   if (!permission) {
@@ -124,7 +162,7 @@ export default function ScanQrScreen() {
           </TouchableOpacity>
 
           <Text className="flex-1 px-2 text-center text-base font-semibold text-slate-100">
-            Scan check-in QR
+            {mode === "join" ? "Scan to Join Gym" : "Scan Check-in QR"}
           </Text>
 
           <View className="h-9 w-9" />
@@ -140,10 +178,12 @@ export default function ScanQrScreen() {
         }}
       >
         <Text className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Gym access
+          Gym Access
         </Text>
         <Text className="mt-1 text-sm text-slate-300">
-          Scan the QR code displayed at your gym entrance.
+          {mode === "join"
+            ? "Scan the QR code provided by your front desk to activate your membership."
+            : "Scan the QR code displayed at the entrance to log your visit."}
         </Text>
 
         {/* Camera Frame */}
@@ -173,7 +213,7 @@ export default function ScanQrScreen() {
 
         {/* Status + actions */}
         <View className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-4">
-          {!scanned && !checkInInfo && (
+          {!scanned && !resultInfo && (
             <>
               <Text className="text-sm font-semibold text-slate-100">
                 Ready to scan
@@ -184,28 +224,21 @@ export default function ScanQrScreen() {
             </>
           )}
 
-          {checkInInfo && (
+          {resultInfo && (
             <View className="flex-row items-start gap-2">
-              <View className="mt-0.5 h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20">
+              <View className={`mt-0.5 h-7 w-7 items-center justify-center rounded-full ${resultInfo.success ? "bg-emerald-500/20" : "bg-red-500/20"}`}>
                 <Ionicons
-                  name="checkmark"
+                  name={resultInfo.success ? "checkmark" : "close"}
                   size={18}
-                  color="#6ee7b7"
+                  color={resultInfo.success ? "#6ee7b7" : "#fca5a5"}
                 />
               </View>
               <View className="flex-1">
-                <Text className="text-sm font-semibold text-emerald-300">
-                  Check-in recorded
+                <Text className={`text-sm font-semibold ${resultInfo.success ? "text-emerald-300" : "text-red-300"}`}>
+                  {resultInfo.title}
                 </Text>
                 <Text className="mt-0.5 text-xs text-slate-300">
-                  Welcome to{" "}
-                  <Text className="font-semibold">
-                    {checkInInfo.gymName}
-                  </Text>
-                  . Your visit for today is now marked.
-                </Text>
-                <Text className="mt-1 text-[11px] text-slate-500">
-                  Gym ID: {checkInInfo.gymId}
+                  {resultInfo.message}
                 </Text>
               </View>
             </View>
@@ -226,24 +259,18 @@ export default function ScanQrScreen() {
             <TouchableOpacity
               className="flex-1 h-11 items-center justify-center rounded-full bg-white/10"
               activeOpacity={0.9}
-              onPress={handleManualCheckIn}
+              onPress={handleManualAction}
               disabled={scanned}
             >
               <Text className={`text-xs font-semibold ${scanned ? "text-zinc-500" : "text-slate-200"}`}>
-                Manual Check-in
+                Manual {mode === "join" ? "Join" : "Check-in"}
               </Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            className="mt-3 h-10 items-center justify-center rounded-full bg-white/5"
-            activeOpacity={0.85}
-            onPress={() => router.push("/attendance")}
-          >
-            <Text className="text-[11px] font-medium text-slate-200">
-              View attendance history
-            </Text>
-          </TouchableOpacity>
+          <Text className="text-[11px] font-medium text-slate-200">
+            View attendance history
+          </Text>
         </View>
       </View>
     </SafeAreaView>

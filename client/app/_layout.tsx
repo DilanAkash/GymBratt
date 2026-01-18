@@ -66,6 +66,7 @@ function RootLayoutNav() {
       <Stack.Screen name="program-details" redirect={!isLogged} />
       <Stack.Screen name="exercise-details" redirect={!isLogged} />
       <Stack.Screen name="meal-details" redirect={!isLogged} />
+      <Stack.Screen name="add-meal" redirect={!isLogged} />
       <Stack.Screen name="add-progress-entry" redirect={!isLogged} />
       <Stack.Screen name="progress-photos" redirect={!isLogged} />
       <Stack.Screen name="settings" redirect={!isLogged} />

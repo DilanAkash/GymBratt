@@ -1,64 +1,78 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SuccessAnimation from "../../components/SuccessAnimation";
+import { useProgramStore } from "../../lib/ProgramStoreContext";
 
 const PRIMARY = "#0df20d";
 
 export default function NutritionScreen() {
   const router = useRouter();
+  const { getDailyNutrition } = useProgramStore();
   const [showSuccess, setShowSuccess] = useState(false);
   const [isDayFollowed, setIsDayFollowed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Dynamic-ready template data (later: Firestore)
-  const today = {
-    label: "Today, Oct 26",
-    caloriesCurrent: 2200,
-    caloriesPlanned: 2500,
-    caloriesProgress: 0.88, // 88%
-    protein: 180,
-    carbs: 250,
-    fats: 70,
+  // Date Logic (Simplification: Just today for now)
+  const todayDate = new Date();
+  const dateLabel = todayDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+  const loadData = async () => {
+    try {
+      const data = await getDailyNutrition(Date.now());
+      setLogs(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const meals = [
-    {
-      id: "breakfast",
-      title: "Breakfast - 8:00 AM",
-      description: "Oatmeal with berries, protein shake",
-      calories: 550,
-      icon: "cafe-outline" as const,
-    },
-    {
-      id: "lunch",
-      title: "Lunch - 1:00 PM",
-      description: "Grilled chicken breast, quinoa, steamed broccoli",
-      calories: 750,
-      icon: "restaurant-outline" as const,
-    },
-    {
-      id: "snack",
-      title: "Snack - 4:00 PM",
-      description: "Greek yogurt with almonds",
-      calories: 300,
-      icon: "ice-cream-outline" as const,
-    },
-    {
-      id: "dinner",
-      title: "Dinner - 7:30 PM",
-      description: "Salmon fillet with roasted asparagus",
-      calories: 600,
-      icon: "pizza-outline" as const,
-    },
-  ];
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  // Derived Totals
+  const totals = useMemo(() => {
+    let cals = 0, p = 0, c = 0, f = 0;
+    logs.forEach(l => {
+      cals += (l.calories || 0);
+      p += (l.macros?.protein || 0);
+      c += (l.macros?.carbs || 0);
+      f += (l.macros?.fats || 0);
+    });
+    return { cals, p, c, f };
+  }, [logs]);
+
+  // Planned Goals (Mock for now, can be in User Profile later)
+  const PLANNED = { cals: 2500, p: 180, c: 250, f: 70 };
+  const progress = Math.min(totals.cals / PLANNED.cals, 1);
+
+  // Group meals by type for display list logic if we wanted, or just flatten. 
+  // The existing UI lists meals. We can just map our logs.
+
+  const mappedMeals = logs.map(l => ({
+    id: l.id,
+    title: l.name,
+    description: `${l.type} • P: ${l.macros?.protein}g C: ${l.macros?.carbs}g F: ${l.macros?.fats}g`,
+    calories: l.calories,
+    icon: l.type === 'breakfast' ? 'cafe-outline' : l.type === 'lunch' ? 'restaurant-outline' : l.type === 'dinner' ? 'pizza-outline' : 'ice-cream-outline'
+  }));
 
   const handleMealPress = (mealId: string, title: string) => {
-    router.push({
-      pathname: "/meal-details",
-      params: { id: mealId, title },
-    });
+    // Navigate to details if needed, or just editing. 
+    // For Basic Log, maybe just viewing info?
+    // Let's just do nothing or show alert for now as "Edit" isn't prioritized in Basic.
   };
 
   const handleMarkFollowed = () => {
@@ -94,7 +108,7 @@ export default function NutritionScreen() {
         </TouchableOpacity>
 
         <Text className="text-[20px] font-bold tracking-tight text-white">
-          {today.label}
+          {dateLabel}
         </Text>
 
         <TouchableOpacity className="h-10 w-10 items-center justify-center rounded-full">
@@ -111,6 +125,9 @@ export default function NutritionScreen() {
             paddingTop: 8,
             paddingBottom: 100,
           }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY} />
+          }
         >
           {/* Daily Summary Card */}
           <View className="mb-6 rounded-2xl border border-white/10 bg-slate-900/60 p-5">
@@ -121,7 +138,7 @@ export default function NutritionScreen() {
                   Calories
                 </Text>
                 <Text className="text-xl font-bold text-[rgb(57,255,20)]">
-                  {today.caloriesCurrent}{" "}
+                  {totals.cals}{" "}
                   <Text className="text-sm font-normal text-slate-400">
                     kcal
                   </Text>
@@ -131,12 +148,12 @@ export default function NutritionScreen() {
               <View className="h-2.5 w-full overflow-hidden rounded-full bg-slate-700">
                 <View
                   className="h-2.5 rounded-full bg-[rgb(57,255,20)]"
-                  style={{ width: `${today.caloriesProgress * 100}%` }}
+                  style={{ width: `${progress * 100}%` }}
                 />
               </View>
 
               <Text className="mt-2 text-right text-sm text-slate-400">
-                Planned: {today.caloriesPlanned} kcal
+                Planned: {PLANNED.cals} kcal
               </Text>
             </View>
 
@@ -144,17 +161,17 @@ export default function NutritionScreen() {
             <View className="mt-1 flex-row flex-wrap items-center justify-center gap-3">
               <View className="h-8 items-center justify-center rounded-full bg-[rgba(57,255,20,0.18)] px-4">
                 <Text className="text-sm font-medium text-[rgb(57,255,20)]">
-                  Protein: {today.protein}g
+                  Protein: {totals.p}g
                 </Text>
               </View>
               <View className="h-8 items-center justify-center rounded-full bg-[rgba(57,255,20,0.18)] px-4">
                 <Text className="text-sm font-medium text-[rgb(57,255,20)]">
-                  Carbs: {today.carbs}g
+                  Carbs: {totals.c}g
                 </Text>
               </View>
               <View className="h-8 items-center justify-center rounded-full bg-[rgba(57,255,20,0.18)] px-4">
                 <Text className="text-sm font-medium text-[rgb(57,255,20)]">
-                  Fats: {today.fats}g
+                  Fats: {totals.f}g
                 </Text>
               </View>
             </View>
@@ -165,13 +182,23 @@ export default function NutritionScreen() {
             <Text className="text-sm font-semibold text-slate-100">
               Today&apos;s meals
             </Text>
-            <Text className="mt-1 text-xs text-slate-500">
-              Tap a meal to view details and ingredients.
+            <TouchableOpacity onPress={() => router.push("/add-meal")}>
+              <Text className="text-xs font-bold text-[rgb(13,242,13)]">+ Add Meal</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View>
+            <Text className="mb-2 mt-1 text-xs text-slate-500">
+              Tap + to log a new meal.
             </Text>
           </View>
 
           <View className="flex flex-col gap-4">
-            {meals.map((meal) => (
+            {loading ? <ActivityIndicator color={PRIMARY} /> : mappedMeals.length === 0 ? (
+              <View className="p-4 items-center bg-white/5 rounded-2xl">
+                <Text className="text-slate-400">No meals logged yet.</Text>
+              </View>
+            ) : mappedMeals.map((meal) => (
               <TouchableOpacity
                 key={meal.id}
                 className="flex-row items-center rounded-2xl border border-white/10 bg-slate-900/60 p-4"
@@ -180,7 +207,7 @@ export default function NutritionScreen() {
               >
                 {/* Icon */}
                 <View className="mr-3 h-12 w-12 items-center justify-center rounded-lg bg-[rgba(57,255,20,0.14)]">
-                  <Ionicons name={meal.icon} size={22} color={PRIMARY} />
+                  <Ionicons name={meal.icon as any} size={22} color={PRIMARY} />
                 </View>
 
                 {/* Text block */}

@@ -20,6 +20,7 @@ export interface AppUser {
   membershipLevel: string;
   phone?: string;
   dob?: string;
+  gymId?: string;
   goal?: string;
 }
 
@@ -36,6 +37,7 @@ type UserContextValue = {
   loading: boolean;
   setUser: (user: AppUser) => void;
   resetUser: () => void;
+  updateGym: (gymId: string, gymName: string) => Promise<void>;
 };
 
 const UserContext = createContext<UserContextValue | undefined>(undefined);
@@ -104,8 +106,15 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setUser(defaultUser);
   };
 
+  const updateGym = async (gymId: string, gymName: string) => {
+    if (!user.uid) return;
+    const userRef = doc(db, "users", user.uid);
+    await setDoc(userRef, { gymId, gymName, membershipStatus: "Active" }, { merge: true });
+    // Local state update will happen via onSnapshot
+  };
+
   return (
-    <UserContext.Provider value={{ user, loading, setUser, resetUser }}>
+    <UserContext.Provider value={{ user, loading, setUser, resetUser, updateGym }}>
       {children}
     </UserContext.Provider>
   );

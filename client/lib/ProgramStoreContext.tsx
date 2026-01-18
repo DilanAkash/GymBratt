@@ -38,6 +38,8 @@ type ProgramStoreValue = {
   addProgressEntry: (entry: any) => Promise<void>;
   getProgressEntries: () => Promise<any[]>;
   uploadProgressPhoto: (uri: string) => Promise<string>;
+  logMeal: (meal: any) => Promise<void>;
+  getDailyNutrition: (dateArg: number) => Promise<any[]>;
 };
 
 const ProgramStoreContext = createContext<ProgramStoreValue | undefined>(
@@ -222,6 +224,24 @@ export const ProgramStoreProvider = ({
     return await programService.uploadProgressPhoto(user.uid, uri);
   };
 
+  const logMeal = async (meal: any) => {
+    if (!user || !user.uid) return;
+    const safeMeal = { ...meal, userId: user.uid };
+    await programService.logMeal(user.uid, safeMeal);
+  };
+
+  const getDailyNutrition = async (dateArg: number): Promise<any[]> => {
+    if (!user || !user.uid) return [];
+    // Start of day
+    const start = new Date(dateArg);
+    start.setHours(0, 0, 0, 0);
+    // End of day
+    const end = new Date(dateArg);
+    end.setHours(23, 59, 59, 999);
+
+    return await programService.getDailyNutrition(user.uid, start.getTime(), end.getTime());
+  };
+
 
 
   return (
@@ -240,6 +260,8 @@ export const ProgramStoreProvider = ({
         addProgressEntry,
         getProgressEntries,
         uploadProgressPhoto,
+        logMeal,
+        getDailyNutrition,
       }}
     >
       {children}
