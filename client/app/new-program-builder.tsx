@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ScrollView,
   Text,
@@ -15,16 +15,6 @@ type BuilderParams = {
   programId?: string;
 };
 
-function cloneDays(days: ProgramDay[]): ProgramDay[] {
-  return days.map((d) => ({
-    ...d,
-    exercises: d.exercises.map((ex) => ({
-      ...ex,
-      sets: ex.sets.map((s) => ({ ...s })),
-    })),
-  }));
-}
-
 export default function NewProgramBuilderScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<BuilderParams>();
@@ -36,35 +26,59 @@ export default function NewProgramBuilderScreen() {
     programs[programs.length - 1] ||
     programs[0];
 
-  const [draftDays, setDraftDays] = useState<ProgramDay[]>([]);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  useEffect(() => {
-    if (program) {
-      const cloned = cloneDays(program.days);
-      setDraftDays(cloned);
-
-      const weeks = new Set(cloned.map((d) => d.weekIndex));
-      setSelectedWeek(weeks.size > 0 ? Math.min(...Array.from(weeks)) : 1);
-    }
-  }, [program?.id]);
+  // Derive state directly from program
+  const days = program?.days || [];
 
   const weeksList = useMemo(() => {
-    const set = new Set(draftDays.map((d) => d.weekIndex));
+    const set = new Set(days.map((d) => d.weekIndex));
     const arr = Array.from(set);
     if (arr.length === 0) return [1];
     return arr.sort((a, b) => a - b);
-  }, [draftDays]);
+  }, [days]);
 
   const weekDays = useMemo(
     () =>
-      draftDays
+      days
         .filter((d) => d.weekIndex === selectedWeek)
         .slice()
         .sort((a, b) => a.dayIndex - b.dayIndex),
-    [draftDays, selectedWeek]
+    [days, selectedWeek]
   );
+
+  const persistDays = async (newDays: ProgramDay[]) => {
+    if (!program) return;
+    setIsUpdating(true);
+    try {
+      // Normalize logic
+      const byWeek = new Map<number, ProgramDay[]>();
+      for (const day of newDays) {
+        const arr = byWeek.get(day.weekIndex) ?? [];
+        arr.push(day);
+        byWeek.set(day.weekIndex, arr);
+      }
+
+      const normalized: ProgramDay[] = [];
+      for (const [week, daysArr] of byWeek.entries()) {
+        const sorted = daysArr.slice().sort((a, b) => a.dayIndex - b.dayIndex);
+        sorted.forEach((d, i) => {
+          normalized.push({
+            ...d,
+            weekIndex: week,
+            dayIndex: i + 1,
+          });
+        });
+      }
+
+      await updateProgramDays(program.id, normalized);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleAddWeek = () => {
     const maxWeek = weeksList.length
@@ -74,9 +88,9 @@ export default function NewProgramBuilderScreen() {
     setSelectedWeek(newWeek);
   };
 
-  const handleAddDay = () => {
+  const handleAddDay = async () => {
     if (!program) return;
-    const existing = draftDays.filter(
+    const existing = days.filter(
       (d) => d.weekIndex === selectedWeek
     );
     const nextDayIndex =
@@ -92,15 +106,14 @@ export default function NewProgramBuilderScreen() {
       weekIndex: selectedWeek,
       dayIndex: nextDayIndex,
       status: "upcoming",
-      // 🔥 No default exercises. User adds them in day builder.
       exercises: [],
     };
 
-    setDraftDays((prev) => [...prev, newDay]);
+    await persistDays([...days, newDay]);
   };
 
-  const handleRemoveDay = (dayId: string) => {
-    setDraftDays((prev) => prev.filter((d) => d.id !== dayId));
+  const handleRemoveDay = async (dayId: string) => {
+    await persistDays(days.filter((d) => d.id !== dayId));
   };
 
   const handleEditDay = (dayId: string) => {
@@ -111,41 +124,12 @@ export default function NewProgramBuilderScreen() {
     });
   };
 
-  const handleSave = async () => {
+  const handleFinish = () => {
     if (!program) return;
-    setIsSaving(true);
-    try {
-      // Normalize dayIndex ordering within each week
-      const byWeek = new Map<number, ProgramDay[]>();
-      for (const day of draftDays) {
-        const arr = byWeek.get(day.weekIndex) ?? [];
-        arr.push(day);
-        byWeek.set(day.weekIndex, arr);
-      }
-
-      const normalized: ProgramDay[] = [];
-      for (const [week, days] of byWeek.entries()) {
-        const sorted = days.slice().sort((a, b) => a.dayIndex - b.dayIndex);
-        sorted.forEach((d, i) => {
-          normalized.push({
-            ...d,
-            weekIndex: week,
-            dayIndex: i + 1,
-          });
-        });
-      }
-
-      await updateProgramDays(program.id, normalized);
-
-      router.replace({
-        pathname: "/program-details",
-        params: { programId: program.id },
-      });
-    } catch (e) {
-      console.error("Error saving program", e);
-    } finally {
-      setIsSaving(false);
-    }
+    router.replace({
+      pathname: "/program-details",
+      params: { programId: program.id },
+    });
   };
 
   if (isLoading && !program) {
@@ -234,8 +218,8 @@ export default function NewProgramBuilderScreen() {
                       key={week}
                       onPress={() => setSelectedWeek(week)}
                       className={`h-8 min-w-[72px] items-center justify-center rounded-full border px-3 ${selected
-                          ? "border-lime-400 bg-lime-400/20"
-                          : "border-white/10 bg-white/5"
+                        ? "border-lime-400 bg-lime-400/20"
+                        : "border-white/10 bg-white/5"
                         }`}
                     >
                       <Text
@@ -333,15 +317,15 @@ export default function NewProgramBuilderScreen() {
         <View className="border-t border-white/10 bg-[#050816]/95 px-4 pb-6 pt-4">
           <TouchableOpacity
             activeOpacity={0.9}
-            disabled={isSaving}
-            className={`h-12 flex-row items-center justify-center rounded-xl ${isSaving
-                ? "bg-lime-500/60"
-                : "bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
+            disabled={isUpdating}
+            className={`h-12 flex-row items-center justify-center rounded-xl ${isUpdating
+              ? "bg-lime-500/60"
+              : "bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
               }`}
-            onPress={handleSave}
+            onPress={handleFinish}
           >
             <Text className="text-sm font-bold text-[#050816]">
-              {isSaving ? "Saving..." : "Save structure & continue"}
+              {isUpdating ? "Saving..." : "Done & View Program"}
             </Text>
           </TouchableOpacity>
         </View>
