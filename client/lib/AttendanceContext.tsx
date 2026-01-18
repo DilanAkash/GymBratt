@@ -1,9 +1,10 @@
 // lib/AttendanceContext.tsx
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, onSnapshot, query, where, orderBy } from "firebase/firestore";
 import React, {
   createContext,
   useContext,
   useState,
+  useEffect,
   type ReactNode,
 } from "react";
 import { auth, db } from "./firebase";
@@ -30,6 +31,30 @@ export const AttendanceProvider = ({
   children: ReactNode;
 }) => {
   const [entries, setEntries] = useState<AttendanceEntry[]>([]);
+
+  useEffect(() => {
+    const userId = auth.currentUser?.uid;
+    if (!userId) {
+      setEntries([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, "attendance"),
+      where("userId", "==", userId),
+      orderBy("timestamp", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetched = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as AttendanceEntry[];
+      setEntries(fetched);
+    });
+
+    return () => unsubscribe();
+  }, [auth.currentUser?.uid]);
 
   const addCheckIn = async ({ gymId }: { gymId: string }) => {
     const now = Date.now();

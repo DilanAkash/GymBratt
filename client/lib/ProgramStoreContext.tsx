@@ -57,20 +57,43 @@ export const ProgramStoreProvider = ({
 
   // Subscribe to programs when user is logged in
   useEffect(() => {
-    if (!user || !user.uid) {
+    const uid = user?.uid;
+    const gymId = user?.gymId;
+
+    if (!uid) {
       setPrograms([]);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
-    const unsubscribe = programService.subscribeToUserPrograms(user.uid, (fetchedPrograms) => {
-      setPrograms(fetchedPrograms);
+
+    let localOwnerPrograms: Program[] = [];
+    let localGymPrograms: Program[] = [];
+
+    const mergeAndSet = () => {
+      setPrograms([...localGymPrograms, ...localOwnerPrograms]);
       setIsLoading(false);
+    };
+
+    const unsubUser = programService.subscribeToUserPrograms(uid, (fetched) => {
+      localOwnerPrograms = fetched;
+      mergeAndSet();
     });
 
-    return () => unsubscribe();
-  }, [user]);
+    let unsubGym = () => { };
+    if (gymId) {
+      unsubGym = programService.subscribeToGymPrograms(gymId, (fetched) => {
+        localGymPrograms = fetched;
+        mergeAndSet();
+      });
+    }
+
+    return () => {
+      unsubUser();
+      unsubGym();
+    };
+  }, [user?.uid, user?.gymId]);
 
   const addUserProgram = async (input: AddUserProgramInput): Promise<Program> => {
     if (!user || !user.uid) throw new Error("User not authenticated");

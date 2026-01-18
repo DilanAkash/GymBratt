@@ -1,23 +1,55 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAppUser } from "../lib/UserContext";
+import QRCode from "react-native-qrcode-svg";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { useState } from "react";
 
 const PRIMARY = "#0df20d";
 
 export default function MembershipDetailsScreen() {
   const router = useRouter();
+  const { user } = useAppUser();
+  const [flipped, setFlipped] = useState(false);
 
-  const membership = {
-    gymName: "Fitness First Gym",
-    planName: "Standard Membership",
-    status: "Active",
-    startedAt: "2025-01-01",
-    expiresAt: "2025-12-31",
-    billingCycle: "Monthly",
-    nextPayment: "2025-03-01",
-    trainer: "Alex Johnson",
+  // Animation values
+  const rotation = useSharedValue(0);
+
+  const frontStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotateY: `${rotation.value}deg` }],
+      backfaceVisibility: 'hidden',
+      position: 'absolute',
+      width: '100%',
+      height: '100%'
+    };
+  });
+
+  const backStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotateY: `${rotation.value + 180}deg` }],
+      backfaceVisibility: 'hidden',
+      position: 'absolute',
+      width: '100%',
+      height: '100%'
+    };
+  });
+
+  const handleFlip = () => {
+    if (flipped) {
+      rotation.value = withSpring(0);
+    } else {
+      rotation.value = withSpring(180);
+    }
+    setFlipped(!flipped);
   };
+
+  // Safe defaults if fields missing
+  const gymName = user.gymName || "No Gym Joined";
+  const plan = user.membershipLevel || "Free Tier";
+  const memberId = user.uid?.substring(0, 8).toUpperCase() || "N/A";
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -32,114 +64,79 @@ export default function MembershipDetailsScreen() {
           </TouchableOpacity>
 
           <Text className="flex-1 px-2 text-center text-lg font-bold text-white">
-            Membership
+            Membership Card
           </Text>
 
           <View className="h-10 w-10" />
         </View>
       </View>
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          paddingTop: 16,
-          paddingBottom: 32,
-        }}
-      >
-        {/* Main card */}
-        <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-          <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            Current membership
-          </Text>
-          <Text className="mt-2 text-lg font-bold text-slate-50">
-            {membership.planName}
-          </Text>
-          <Text className="mt-1 text-xs text-slate-400">
-            {membership.gymName}
-          </Text>
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
 
-          <View className="mt-3 flex-row flex-wrap items-center gap-2">
-            <View className="rounded-full bg-[rgba(13,242,13,0.16)] px-3 py-1">
-              <Text className="text-[11px] font-semibold text-[#0df20d]">
-                {membership.status}
-              </Text>
-            </View>
-            <View className="rounded-full bg-white/10 px-3 py-1">
-              <Text className="text-[11px] font-medium text-slate-200">
-                {membership.billingCycle} billing
-              </Text>
-            </View>
-          </View>
+        <View style={{ height: 220, marginBottom: 24 }}>
+          <TouchableOpacity activeOpacity={0.9} onPress={handleFlip} style={{ flex: 1 }}>
 
-          <View className="mt-4 flex-row justify-between">
-            <View>
-              <Text className="text-[11px] uppercase tracking-wide text-slate-500">
-                Start date
-              </Text>
-              <Text className="mt-1 text-sm font-semibold text-slate-50">
-                {membership.startedAt}
-              </Text>
-            </View>
-            <View>
-              <Text className="text-[11px] uppercase tracking-wide text-slate-500">
-                Expires
-              </Text>
-              <Text className="mt-1 text-sm font-semibold text-slate-50">
-                {membership.expiresAt}
-              </Text>
-            </View>
-          </View>
-        </View>
+            {/* Front Side */}
+            <Animated.View style={[frontStyle]} className="rounded-3xl bg-slate-800 overflow-hidden border border-white/10 p-6 flex justify-between">
+              <View className="absolute right-[-40] top-[-40] w-40 h-40 bg-[rgba(13,242,13,0.1)] rounded-full blur-2xl" />
 
-        {/* Trainer */}
-        <View className="mb-6 rounded-3xl border border-white/10 bg-white/5 p-4">
-          <Text className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            Assigned trainer
-          </Text>
-          <View className="flex-row items-center">
-            <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-white/10">
-              <Ionicons name="person-outline" size={20} color="#e5e7eb" />
-            </View>
-            <View>
-              <Text className="text-sm font-semibold text-slate-50">
-                {membership.trainer}
-              </Text>
-              <Text className="mt-1 text-xs text-slate-400">
-                Contact them via Requests & messages
-              </Text>
-            </View>
-          </View>
-        </View>
+              <View className="flex-row justify-between items-start">
+                <View>
+                  <Text className="text-xl font-bold text-white tracking-widest uppercase">{gymName}</Text>
+                  <Text className="text-xs text-lime-400 uppercase tracking-widest mt-1">Member Access</Text>
+                </View>
+                <Ionicons name="grid" size={24} color="rgba(255,255,255,0.2)" />
+              </View>
 
-        {/* Actions */}
-        <View className="rounded-3xl border border-white/10 bg-white/5 p-4">
-          <TouchableOpacity
-            className="flex-row items-center justify-between py-2"
-            activeOpacity={0.85}
-            onPress={() => router.push("/payments")}
-          >
-            <View className="flex-row items-center">
-              <Ionicons name="wallet-outline" size={18} color="#e5e7eb" />
-              <Text className="ml-2 text-sm text-slate-50">
-                View payment history
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#6b7280" />
-          </TouchableOpacity>
+              <View>
+                <Text className="text-slate-400 text-xs uppercase tracking-wider mb-1">Card Holder</Text>
+                <Text className="text-lg font-bold text-white mb-4">{user.fullName}</Text>
 
-          <View className="h-[1px] w-full bg-white/10" />
+                <View className="flex-row justify-between items-end">
+                  <View>
+                    <Text className="text-slate-500 text-[10px] uppercase">ID Number</Text>
+                    <Text className="text-slate-300 font-mono text-sm">{memberId}</Text>
+                  </View>
+                  <View>
+                    <Text className="text-slate-500 text-[10px] uppercase text-right">Plan</Text>
+                    <Text className="text-lime-400 font-bold text-sm text-right">{plan}</Text>
+                  </View>
+                </View>
+              </View>
+            </Animated.View>
 
-          <TouchableOpacity className="flex-row items-center justify-between py-2" activeOpacity={0.85}>
-            <View className="flex-row items-center">
-              <Ionicons name="swap-horizontal-outline" size={18} color="#e5e7eb" />
-              <Text className="ml-2 text-sm text-slate-50">
-                Request plan change
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#6b7280" />
+            {/* Back Side (QR) */}
+            <Animated.View style={[backStyle]} className="rounded-3xl bg-white items-center justify-center p-6 border border-white/10">
+              <Text className="text-black font-bold mb-4">Scan for Entry</Text>
+              {user.uid && <QRCode value={user.uid} size={120} />}
+              <Text className="text-slate-500 text-xs mt-4">{memberId}</Text>
+            </Animated.View>
+
           </TouchableOpacity>
         </View>
+
+        <Text className="text-center text-zinc-500 text-xs mb-8">Tap card to flip and view QR code</Text>
+
+        {/* Details List */}
+        <View className="rounded-3xl border border-white/10 bg-white/5 p-5 mb-6">
+          <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 mb-4">Plan Details</Text>
+
+          <View className="flex-row justify-between mb-4">
+            <Text className="text-slate-300">Status</Text>
+            <View className="rounded-full bg-lime-500/20 px-2 py-0.5">
+              <Text className="text-lime-400 text-xs font-bold">{user.membershipStatus}</Text>
+            </View>
+          </View>
+          <View className="flex-row justify-between mb-4">
+            <Text className="text-slate-300">Gym</Text>
+            <Text className="text-white font-medium">{gymName}</Text>
+          </View>
+          <View className="flex-row justify-between">
+            <Text className="text-slate-300">Member Since</Text>
+            <Text className="text-white font-medium">Jan 2024</Text>
+          </View>
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );

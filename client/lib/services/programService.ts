@@ -30,6 +30,9 @@ const sanitize = (obj: any): any => {
 // Users sub-collection path
 const getUserProgramsRef = (userId: string) => collection(db, "users", userId, "programs");
 
+// Gyms sub-collection path
+const getGymProgramsRef = (gymId: string) => collection(db, "gyms", gymId, "coachPrograms");
+
 export const programService = {
     // Subscribe to user's programs (real-time)
     subscribeToUserPrograms: (userId: string, onUpdate: (programs: Program[]) => void) => {
@@ -38,6 +41,19 @@ export const programService = {
             const programs = snapshot.docs.map(doc => ({
                 ...doc.data(),
                 id: doc.id
+            })) as Program[];
+            onUpdate(programs);
+        });
+    },
+
+    // Subscribe to gym's coach programs
+    subscribeToGymPrograms: (gymId: string, onUpdate: (programs: Program[]) => void) => {
+        const q = query(getGymProgramsRef(gymId));
+        return onSnapshot(q, (snapshot) => {
+            const programs = snapshot.docs.map(doc => ({
+                ...doc.data(),
+                id: doc.id,
+                source: 'coach' // Ensure source is coach
             })) as Program[];
             onUpdate(programs);
         });
