@@ -28,26 +28,27 @@ function cloneDays(days: ProgramDay[]): ProgramDay[] {
 export default function NewProgramBuilderScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<BuilderParams>();
-  const { programs, updateProgramDays } = useProgramStore();
+  const { programs, updateProgramDays, isLoading } = useProgramStore();
 
-  const program: Program =
+  const program: Program | undefined =
     (params.programId &&
       programs.find((p) => p.id === params.programId)) ||
     programs[programs.length - 1] ||
     programs[0];
 
-  const [draftDays, setDraftDays] = useState<ProgramDay[]>(() =>
-    cloneDays(program.days)
-  );
-  const [selectedWeek, setSelectedWeek] = useState<number>(() => {
-    const weeks = new Set(draftDays.map((d) => d.weekIndex));
-    return weeks.size > 0 ? Math.min(...Array.from(weeks)) : 1;
-  });
+  const [draftDays, setDraftDays] = useState<ProgramDay[]>([]);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setDraftDays(cloneDays(program.days));
-  }, [program.id]);
+    if (program) {
+      const cloned = cloneDays(program.days);
+      setDraftDays(cloned);
+
+      const weeks = new Set(cloned.map((d) => d.weekIndex));
+      setSelectedWeek(weeks.size > 0 ? Math.min(...Array.from(weeks)) : 1);
+    }
+  }, [program?.id]);
 
   const weeksList = useMemo(() => {
     const set = new Set(draftDays.map((d) => d.weekIndex));
@@ -74,6 +75,7 @@ export default function NewProgramBuilderScreen() {
   };
 
   const handleAddDay = () => {
+    if (!program) return;
     const existing = draftDays.filter(
       (d) => d.weekIndex === selectedWeek
     );
@@ -97,19 +99,20 @@ export default function NewProgramBuilderScreen() {
     setDraftDays((prev) => [...prev, newDay]);
   };
 
-
   const handleRemoveDay = (dayId: string) => {
     setDraftDays((prev) => prev.filter((d) => d.id !== dayId));
   };
 
   const handleEditDay = (dayId: string) => {
+    if (!program) return;
     router.push({
       pathname: "/program-day-builder",
       params: { programId: program.id, dayId },
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!program) return;
     setIsSaving(true);
     try {
       // Normalize dayIndex ordering within each week
@@ -132,16 +135,34 @@ export default function NewProgramBuilderScreen() {
         });
       }
 
-      updateProgramDays(program.id, normalized);
+      await updateProgramDays(program.id, normalized);
 
       router.replace({
         pathname: "/program-details",
         params: { programId: program.id },
       });
+    } catch (e) {
+      console.error("Error saving program", e);
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (isLoading && !program) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#050816] items-center justify-center">
+        <Text className="text-white">Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!program) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#050816] items-center justify-center">
+        <Text className="text-white">Program not found</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -212,16 +233,14 @@ export default function NewProgramBuilderScreen() {
                     <TouchableOpacity
                       key={week}
                       onPress={() => setSelectedWeek(week)}
-                      className={`h-8 min-w-[72px] items-center justify-center rounded-full border px-3 ${
-                        selected
+                      className={`h-8 min-w-[72px] items-center justify-center rounded-full border px-3 ${selected
                           ? "border-lime-400 bg-lime-400/20"
                           : "border-white/10 bg-white/5"
-                      }`}
+                        }`}
                     >
                       <Text
-                        className={`text-xs font-semibold ${
-                          selected ? "text-lime-300" : "text-neutral-200"
-                        }`}
+                        className={`text-xs font-semibold ${selected ? "text-lime-300" : "text-neutral-200"
+                          }`}
                       >
                         Week {week}
                       </Text>
@@ -315,11 +334,10 @@ export default function NewProgramBuilderScreen() {
           <TouchableOpacity
             activeOpacity={0.9}
             disabled={isSaving}
-            className={`h-12 flex-row items-center justify-center rounded-xl ${
-              isSaving
+            className={`h-12 flex-row items-center justify-center rounded-xl ${isSaving
                 ? "bg-lime-500/60"
                 : "bg-[rgb(13,242,13)] shadow-[0_0_20px_rgba(13,242,13,0.5)]"
-            }`}
+              }`}
             onPress={handleSave}
           >
             <Text className="text-sm font-bold text-[#050816]">

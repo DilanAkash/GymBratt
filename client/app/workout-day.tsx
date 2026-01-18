@@ -7,6 +7,7 @@ import {
   Alert,
   ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   Vibration,
   View,
@@ -17,6 +18,9 @@ import {
   type ProgramDay,
   type ProgramExercise,
   type ProgramSetSchema,
+  type WorkoutLog,
+  type LoggedExercise,
+  type LoggedSet,
 } from "../lib/mockPrograms";
 import { useProgramStore } from "../lib/ProgramStoreContext";
 import { ConfettiCelebration } from "../components/ConfettiCelebration";
@@ -78,7 +82,7 @@ function formatSeconds(total: number): string {
 export default function WorkoutDayScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<WorkoutDayParams>();
-  const { programs, completeWorkoutDay } = useProgramStore();
+  const { programs, completeWorkoutDay, logWorkout } = useProgramStore();
 
   const { program, day } = findProgramAndDay(
     programs,
@@ -87,6 +91,19 @@ export default function WorkoutDayScreen() {
   );
 
   const [completedSets, setCompletedSets] = useState<CompletedMap>({});
+
+  // State for logged values: key -> { weight, reps, rpe }
+  const [loggedData, setLoggedData] = useState<Record<string, { weight: string, reps: string, rpe: string }>>({});
+
+  const updateLog = (key: string, field: "weight" | "reps" | "rpe", value: string) => {
+    setLoggedData((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: value,
+      },
+    }));
+  };
 
   // Celebration State
   const [showCelebration, setShowCelebration] = useState(false);
@@ -447,9 +464,45 @@ export default function WorkoutDayScreen() {
       // 🎉 Trigger Celebration
       setShowCelebration(true);
 
-      await Promise.resolve(
+      const workoutLog: WorkoutLog = {
+        id: `log-${Date.now()}`,
+        userId: "temp", // context will override
+        programId: program.id,
+        programName: program.name,
+        dayId: day.id,
+        dayTitle: day.title,
+        date: Date.now(),
+        durationSeconds: 3600, // TODO: track actual duration
+        exercises: day.exercises.map(ex => {
+          const sets: LoggedSet[] = ex.sets.map((s, idx) => {
+            const key = `${ex.id}-${s.id}-${idx}`;
+            const data = loggedData[key] || {};
+
+            // Extract numeric target reps if simple range
+            const targetRepsMatch = s.targetReps.match(/(\d+)/);
+            const defaultReps = targetRepsMatch ? parseInt(targetRepsMatch[1]) : 0;
+
+            return {
+              setNumber: idx + 1,
+              completed: !!completedSets[key],
+              weight: data.weight ? parseFloat(data.weight) : undefined,
+              reps: data.reps ? parseInt(data.reps) : defaultReps,
+              rpe: data.rpe ? parseFloat(data.rpe) : undefined
+            };
+          });
+
+          return {
+            exerciseId: ex.id,
+            name: ex.name,
+            sets
+          };
+        })
+      };
+
+      await Promise.all([
+        logWorkout(workoutLog),
         completeWorkoutDay(program.id, day.id)
-      );
+      ]);
 
       // Wait 2.5s for the user to enjoy the confetti
       setTimeout(() => {
@@ -712,6 +765,7 @@ export default function WorkoutDayScreen() {
                 {exercise.sets.map((set, index) => {
                   const key = `${exercise.id}-${set.id}-${index}`;
                   const isDone = !!completedSets[key];
+                  const data = loggedData[key] || {};
 
                   // Highlight this as the "ready" set when rest has finished
                   const isNextHighlight =
@@ -723,56 +777,84 @@ export default function WorkoutDayScreen() {
                   return (
                     <View
                       key={key}
-                      className={`mb-2 flex-row items-center justify-between ${isNextHighlight
-                        ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10"
-                        : ""
+                      className={`mb-2 ${isNextHighlight
+                        ? "rounded-xl border border-[#0df20d] bg-[#0df20d]/10 p-2"
+                        : "p-1"
                         }`}
                     >
-                      <View className="flex-row items-center gap-3 px-1 py-1">
-                        <Text className="text-xs font-semibold text-zinc-500">
-                          {index + 1}
-                        </Text>
-                        <View>
-                          <Text className="text-sm text-slate-50">
-                            {set.targetReps}
-                          </Text>
-                          <View className="mt-0.5 flex-row flex-wrap gap-2">
-                            {set.rpe && (
-                              <Text className="text-[11px] text-zinc-400">
-                                {set.rpe}
-                              </Text>
-                            )}
-                            {set.rest && (
-                              <Text className="text-[11px] text-zinc-500">
-                                {set.rest}
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-1 flex-row items-center gap-3">
+                          <View className="h-6 w-6 items-center justify-center rounded-full bg-white/10">
+                            <Text className="text-xs font-semibold text-zinc-400">
+                              {index + 1}
+                            </Text>
+                          </View>
+
+                          <View>
+                            <Text className="text-xs text-zinc-400">{set.targetReps}</Text>
+                            {isNextHighlight && (
+                              <Text className="text-[10px] font-bold text-[#0df20d]">
+                                UP NEXT
                               </Text>
                             )}
                           </View>
-                          {isNextHighlight && (
-                            <Text className="mt-0.5 text-[11px] font-semibold text-[#0df20d]">
-                              Ready — this is your next set
-                            </Text>
-                          )}
                         </View>
+
+                        <TouchableOpacity
+                          className={`h-8 px-4 items-center justify-center rounded-lg border ${isDone
+                            ? "border-[#0df20d] bg-[#0df20d]"
+                            : "border-white/20 bg-white/5"
+                            }`}
+                          activeOpacity={0.85}
+                          onPress={() =>
+                            handleSetPress(key, exercise, set, index)
+                          }
+                        >
+                          <Text
+                            className={`text-xs font-bold ${isDone ? "text-[#050816]" : "text-slate-100"
+                              }`}
+                          >
+                            {isDone ? "DONE" : "Log"}
+                          </Text>
+                        </TouchableOpacity>
                       </View>
 
-                      <TouchableOpacity
-                        className={`h-7 min-w-[88px] items-center justify-center rounded-full border ${isDone
-                          ? "border-[#0df20d] bg-[#0df20d]"
-                          : "border-white/30 bg-transparent"
-                          }`}
-                        activeOpacity={0.85}
-                        onPress={() =>
-                          handleSetPress(key, exercise, set, index)
-                        }
-                      >
-                        <Text
-                          className={`text-[11px] font-semibold ${isDone ? "text-[#050816]" : "text-slate-100"
-                            }`}
-                        >
-                          {isDone ? "Done" : "Mark done"}
-                        </Text>
-                      </TouchableOpacity>
+                      {/* Input Row */}
+                      <View className="mt-2 flex-row gap-2">
+                        <View className="flex-1">
+                          <Text className="mb-1 text-[10px] text-zinc-500 uppercase">lbs / kg</Text>
+                          <TextInput
+                            keyboardType="numeric"
+                            placeholder="0"
+                            placeholderTextColor="#525252"
+                            value={data.weight}
+                            onChangeText={(val) => updateLog(key, 'weight', val)}
+                            className="h-9 rounded-md bg-black/40 px-3 text-sm text-white border border-white/10"
+                          />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="mb-1 text-[10px] text-zinc-500 uppercase">Reps</Text>
+                          <TextInput
+                            keyboardType="numeric"
+                            placeholder={set.targetReps.replace(/[^0-9]/g, '') || "0"}
+                            placeholderTextColor="#525252"
+                            value={data.reps}
+                            onChangeText={(val) => updateLog(key, 'reps', val)}
+                            className="h-9 rounded-md bg-black/40 px-3 text-sm text-white border border-white/10"
+                          />
+                        </View>
+                        <View className="w-16">
+                          <Text className="mb-1 text-[10px] text-zinc-500 uppercase">RPE</Text>
+                          <TextInput
+                            keyboardType="numeric"
+                            placeholder="-"
+                            placeholderTextColor="#525252"
+                            value={data.rpe}
+                            onChangeText={(val) => updateLog(key, 'rpe', val)}
+                            className="h-9 rounded-md bg-black/40 px-3 text-sm text-white border border-white/10"
+                          />
+                        </View>
+                      </View>
                     </View>
                   );
                 })}

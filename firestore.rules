@@ -1,0 +1,96 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Check if user has 'admin' role in their user profile
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Check if user is a trainer for the specific gym
+    function isTrainerInGym(gymId) {
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return isAuthenticated() && 
+             userData.role == 'trainer' && 
+             userData.gymId == gymId;
+    }
+    
+    // Check if user is a member of the specific gym
+    function isMemberOfGym(gymId) {
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return isAuthenticated() && userData.gymId == gymId;
+    }
+    
+    // Users Collection
+    match /users/{userId} {
+      // Users can read their own profile. Admins and Trainers (if needed) can read too.
+      allow read: if isOwner(userId) || isAdmin(); 
+      // Users can create their own profile on signup
+      allow create: if isOwner(userId);
+      // Users can update their own profile. Admins can update any.
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+      
+      // User's programs (Standalone & Gym)
+      match /programs/{programId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's workout logs
+      match /workoutLogs/{logId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's progress entries
+      match /progressEntries/{entryId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // User's nutrition logs
+      match /nutritionLogs/{logId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // Gyms Collection
+    match /gyms/{gymId} {
+      allow read: if isAuthenticated(); // Public info (like gym name) might be needed for connection
+      allow create, update, delete: if isAdmin();
+      
+      // Coach programs (gym-specific)
+      match /coachPrograms/{programId} {
+        allow read: if isMemberOfGym(gymId) || isTrainerInGym(gymId) || isAdmin();
+        allow create, update, delete: if isTrainerInGym(gymId) || isAdmin();
+      }
+      
+      // Attendance
+      match /attendance/{attendanceId} {
+        allow read: if isMemberOfGym(gymId) || isTrainerInGym(gymId) || isAdmin();
+        allow create: if isMemberOfGym(gymId); // Member scans QR to create entry
+        allow update, delete: if isAdmin();
+      }
+      
+      // Members sub-collection (gym membership details)
+      match /members/{memberId} {
+        allow read: if isMemberOfGym(gymId) || isTrainerInGym(gymId) || isAdmin();
+        allow create, update, delete: if isAdmin() || isTrainerInGym(gymId);
+      }
+      
+      // Requests
+      match /requests/{requestId} {
+        allow read: if isMemberOfGym(gymId) || isTrainerInGym(gymId) || isAdmin();
+        allow create: if isMemberOfGym(gymId);
+        allow update: if isTrainerInGym(gymId) || isAdmin();
+      }
+    }
+  }
+}

@@ -119,57 +119,49 @@ const adjustReps = (current: string, delta: number): string => {
 export default function ProgramDayBuilderScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
-  const { programs, updateProgramDays } = useProgramStore();
+  const { programs, updateProgramDays, isLoading } = useProgramStore();
 
-  const program: Program =
+  const program: Program | undefined =
     (params.programId &&
       programs.find((p) => p.id === params.programId)) ||
     programs[programs.length - 1] ||
     programs[0];
 
   const baseDay =
-    (params.dayId &&
+    (params.dayId && program?.days &&
       program.days.find((d) => d.id === params.dayId)) ||
-    program.days[0];
+    (program?.days && program.days[0]);
 
-  const [draftDay, setDraftDay] = useState<ProgramDay>(() =>
-    cloneDay(baseDay)
-  );
+  const [draftDay, setDraftDay] = useState<ProgramDay | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    setDraftDay(cloneDay(baseDay));
-  }, [baseDay.id]);
+    if (baseDay) {
+      setDraftDay(cloneDay(baseDay));
+    }
+  }, [baseDay?.id]);
 
-  const weekLabel = useMemo(
-    () => `Week ${draftDay.weekIndex}, Day ${draftDay.dayIndex}`,
-    [draftDay.weekIndex, draftDay.dayIndex]
-  );
+  const weekLabel = useMemo(() => {
+    if (!draftDay) return "";
+    return `Week ${draftDay.weekIndex}, Day ${draftDay.dayIndex}`;
+  }, [draftDay?.weekIndex, draftDay?.dayIndex]);
 
   const handleChangeTitle = (value: string) => {
-    setDraftDay((prev) => ({
-      ...prev,
-      title: value,
-    }));
+    setDraftDay((prev) => (prev ? { ...prev, title: value } : null));
   };
 
   const handleChangeSubtitle = (value: string) => {
-    setDraftDay((prev) => ({
-      ...prev,
-      subtitle: value,
-    }));
+    setDraftDay((prev) => (prev ? { ...prev, subtitle: value } : null));
   };
 
   const handleChangeFocus = (value: string) => {
-    setDraftDay((prev) => ({
-      ...prev,
-      focus: value,
-    }));
+    setDraftDay((prev) => (prev ? { ...prev, focus: value } : null));
   };
 
   const handleAddExercise = (
     preset?: (typeof EXERCISE_LIBRARY)[number]
   ) => {
+    if (!draftDay) return;
     const newExercise: ProgramExercise = {
       id: `${draftDay.id}-ex-${Date.now()}`,
       name: preset?.name ?? "New exercise",
@@ -188,17 +180,17 @@ export default function ProgramDayBuilderScreen() {
       ],
     };
 
-    setDraftDay((prev) => ({
+    setDraftDay((prev) => (prev ? {
       ...prev,
       exercises: [...prev.exercises, newExercise],
-    }));
+    } : null));
   };
 
   const handleRemoveExercise = (exerciseId: string) => {
-    setDraftDay((prev) => ({
+    setDraftDay((prev) => (prev ? {
       ...prev,
       exercises: prev.exercises.filter((ex) => ex.id !== exerciseId),
-    }));
+    } : null));
   };
 
   const handleMoveExercise = (
@@ -206,6 +198,7 @@ export default function ProgramDayBuilderScreen() {
     direction: "up" | "down"
   ) => {
     setDraftDay((prev) => {
+      if (!prev) return null;
       const idx = prev.exercises.findIndex((ex) => ex.id === exerciseId);
       if (idx === -1) return prev;
 
@@ -229,12 +222,12 @@ export default function ProgramDayBuilderScreen() {
     exerciseId: string,
     patch: Partial<ProgramExercise>
   ) => {
-    setDraftDay((prev) => ({
+    setDraftDay((prev) => (prev ? {
       ...prev,
       exercises: prev.exercises.map((ex) =>
         ex.id === exerciseId ? { ...ex, ...patch } : ex
       ),
-    }));
+    } : null));
   };
 
   const handleUpdateSet = (
@@ -242,7 +235,7 @@ export default function ProgramDayBuilderScreen() {
     setIndex: number,
     patch: Partial<ProgramSetSchema>
   ) => {
-    setDraftDay((prev) => ({
+    setDraftDay((prev) => (prev ? {
       ...prev,
       exercises: prev.exercises.map((ex) => {
         if (ex.id !== exerciseId) return ex;
@@ -251,42 +244,45 @@ export default function ProgramDayBuilderScreen() {
         );
         return { ...ex, sets };
       }),
-    }));
+    } : null));
   };
 
   const handleAddSet = (exerciseId: string) => {
-    setDraftDay((prev) => ({
-      ...prev,
-      exercises: prev.exercises.map((ex) => {
-        if (ex.id !== exerciseId) return ex;
-        const last = ex.sets[ex.sets.length - 1];
-        const newIndex = ex.sets.length + 1;
+    setDraftDay((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        exercises: prev.exercises.map((ex) => {
+          if (ex.id !== exerciseId) return ex;
+          const last = ex.sets[ex.sets.length - 1];
+          const newIndex = ex.sets.length + 1;
 
-        const newSet: ProgramSetSchema = last
-          ? {
-            ...last,
-            id: `s${newIndex}`,
-            label: `Set ${newIndex}`,
-          }
-          : {
-            id: `s${newIndex}`,
-            label: `Set ${newIndex}`,
-            targetReps: "10",
-            rpe: "RPE 8",
-            rest: "90s",
-            restSeconds: 90,
+          const newSet: ProgramSetSchema = last
+            ? {
+              ...last,
+              id: `s${newIndex}`,
+              label: `Set ${newIndex}`,
+            }
+            : {
+              id: `s${newIndex}`,
+              label: `Set ${newIndex}`,
+              targetReps: "10",
+              rpe: "RPE 8",
+              rest: "90s",
+              restSeconds: 90,
+            };
+
+          return {
+            ...ex,
+            sets: [...ex.sets, newSet],
           };
-
-        return {
-          ...ex,
-          sets: [...ex.sets, newSet],
-        };
-      }),
-    }));
+        }),
+      }
+    });
   };
 
   const handleRemoveSet = (exerciseId: string, setIndex: number) => {
-    setDraftDay((prev) => ({
+    setDraftDay((prev) => (prev ? {
       ...prev,
       exercises: prev.exercises.map((ex) => {
         if (ex.id !== exerciseId) return ex;
@@ -294,12 +290,13 @@ export default function ProgramDayBuilderScreen() {
         const sets = ex.sets.filter((_, idx) => idx !== setIndex);
         return { ...ex, sets };
       }),
-    }));
+    } : null));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
     try {
+      if (!program || !draftDay) return;
       const updatedDays = program.days.map((day) =>
         day.id === draftDay.id
           ? {
@@ -318,16 +315,26 @@ export default function ProgramDayBuilderScreen() {
           : day
       );
 
-      updateProgramDays(program.id, updatedDays);
+      await updateProgramDays(program.id, updatedDays);
 
       router.replace({
         pathname: "/new-program-builder",
         params: { programId: program.id },
       });
+    } catch (e) {
+      console.error("Error saving day", e);
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (isLoading && !program) {
+    return <SafeAreaView className="flex-1 bg-[#050816] items-center justify-center"><Text className="text-white">Loading...</Text></SafeAreaView>;
+  }
+
+  if (!program || !draftDay) {
+    return <SafeAreaView className="flex-1 bg-[#050816] items-center justify-center"><Text className="text-white">Day not found</Text></SafeAreaView>;
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-[#050816]">
@@ -335,7 +342,7 @@ export default function ProgramDayBuilderScreen() {
       <View className="border-b border-white/10 bg-[#050816]/80 px-4 pb-3 pt-4">
         <View className="flex-row items-center justify-between">
           <TouchableOpacity
-            className="h-9 w-9 items-center justify-center rounded-full bg.white/10"
+            className="h-9 w-9 items-center justify-center rounded-full bg-white/10"
             onPress={() => router.back()}
           >
             <Ionicons name="chevron-back" size={20} color="#ffffff" />

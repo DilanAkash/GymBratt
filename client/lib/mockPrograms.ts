@@ -60,6 +60,32 @@ export interface Program {
   days: ProgramDay[];
 }
 
+export interface LoggedSet {
+  setNumber: number;
+  weight?: number; // in kg or lbs
+  reps: number;
+  rpe?: number;
+  completed: boolean;
+}
+
+export interface LoggedExercise {
+  exerciseId: string;
+  name: string;
+  sets: LoggedSet[];
+}
+
+export interface WorkoutLog {
+  id: string;
+  userId: string;
+  programId: string;
+  programName: string;
+  dayId: string;
+  dayTitle: string;
+  date: number; // timestamp
+  durationSeconds: number;
+  exercises: LoggedExercise[];
+}
+
 export const MOCK_PROGRAMS: Program[] = [
   {
     id: "lean-bulk-12w",
