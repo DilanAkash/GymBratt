@@ -13,13 +13,14 @@ import {
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth, db } from "../../lib/firebase";
+import { useProgramStore } from "../../lib/ProgramStoreContext";
 
 const PRIMARY = "#0df20d";
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function ProgressScreen() {
   const router = useRouter();
+  const { getProgressEntries } = useProgramStore();
   const [data, setData] = useState<{ id: string; weight: number; date: number }[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -34,23 +35,14 @@ export default function ProgressScreen() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Fetch last 10 entries
-      const q = query(
-        collection(db, "progress"),
-        orderBy("date", "desc"),
-        limit(10)
-      );
-      const snapshot = await getDocs(q);
-      const entries = snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data()
-      } as { id: string; weight: number; date: number })).reverse();
+      const entries = await getProgressEntries();
+      const reversedEntries = [...entries].reverse(); // Chart wants chronological order
 
-      setData(entries);
+      setData(reversedEntries);
 
-      if (entries.length > 0) {
-        const latest = entries[entries.length - 1];
-        const previous = entries.length > 1 ? entries[0] : latest; // compare vs fast entry for simple trend
+      if (reversedEntries.length > 0) {
+        const latest = reversedEntries[reversedEntries.length - 1];
+        const previous = reversedEntries.length > 1 ? reversedEntries[0] : latest; // compare vs first entry for simple trend
         const diff = latest.weight - previous.weight;
 
         setWeight({

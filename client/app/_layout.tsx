@@ -57,6 +57,7 @@ function RootLayoutNav() {
       {/* Protected App Screens - Redirect to Welcome if NOT logged in */}
       <Stack.Screen name="(tabs)" redirect={!isLogged} options={{ gestureEnabled: false }} />
       <Stack.Screen name="edit-profile" redirect={!isLogged} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="workout-history" redirect={!isLogged} />
 
       <Stack.Screen name="workout-day" redirect={!isLogged} />
       <Stack.Screen name="program-day-builder" redirect={!isLogged} />

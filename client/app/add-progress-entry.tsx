@@ -1,23 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { addDoc, collection } from "firebase/firestore";
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View, ActivityIndicator, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { auth, db } from "../lib/firebase";
+import { useProgramStore } from "../lib/ProgramStoreContext";
 
 const PRIMARY = "#0df20d";
 
 export default function AddProgressEntryScreen() {
   const router = useRouter();
+  const { addProgressEntry, uploadProgressPhoto } = useProgramStore();
   const [isSaving, setIsSaving] = useState(false);
 
   // Form State
@@ -28,6 +21,30 @@ export default function AddProgressEntryScreen() {
   const [hips, setHips] = useState("");
   const [notes, setNotes] = useState("");
 
+  const [photos, setPhotos] = useState<{ [key: string]: string | null }>({
+    Front: null,
+    Side: null,
+    Back: null,
+  });
+
+  const pickImage = async (label: string) => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [3, 4],
+        quality: 0.8,
+      });
+
+      if (!result.canceled) {
+        setPhotos((prev) => ({ ...prev, [label]: result.assets[0].uri }));
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Could not pick image.");
+    }
+  };
+
   const handleSave = async () => {
     if (!weight) {
       Alert.alert("Missing Input", "Please enter at least your weight.");
@@ -36,9 +53,17 @@ export default function AddProgressEntryScreen() {
 
     setIsSaving(true);
     try {
-      const userId = auth.currentUser?.uid || "mock-user-id";
+      // 1. Upload photos if any
+      const uploadedPhotos: { [key: string]: string } = {};
+
+      for (const [label, uri] of Object.entries(photos)) {
+        if (uri) {
+          const downloadUrl = await uploadProgressPhoto(uri);
+          uploadedPhotos[label] = downloadUrl;
+        }
+      }
+
       const entry = {
-        userId,
         date: Date.now(),
         weight: parseFloat(weight) || 0,
         bodyFat: parseFloat(bodyFat) || null,
@@ -47,10 +72,11 @@ export default function AddProgressEntryScreen() {
           waist: parseFloat(waist) || null,
           hips: parseFloat(hips) || null,
         },
+        photos: uploadedPhotos,
         notes: notes.trim(),
       };
 
-      await addDoc(collection(db, "progress"), entry);
+      await addProgressEntry(entry);
 
       router.back();
     } catch (error) {
@@ -225,13 +251,25 @@ export default function AddProgressEntryScreen() {
               {["Front", "Side", "Back"].map((label) => (
                 <TouchableOpacity
                   key={label}
-                  className="flex-1 items-center justify-center rounded-xl border border-dashed border-slate-600 bg-slate-900/70 px-2 py-6"
+                  className="flex-1 items-center justify-center rounded-xl border border-dashed border-slate-600 bg-slate-900/70 overflow-hidden"
+                  style={{ height: 120 }}
                   activeOpacity={0.8}
+                  onPress={() => pickImage(label)}
                 >
-                  <Ionicons name="camera-outline" size={22} color="#9ca3af" />
-                  <Text className="mt-2 text-xs font-medium text-slate-300">
-                    {label}
-                  </Text>
+                  {photos[label] ? (
+                    <Image
+                      source={{ uri: photos[label]! }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View className="items-center justify-center p-2">
+                      <Ionicons name="camera-outline" size={22} color="#9ca3af" />
+                      <Text className="mt-2 text-xs font-medium text-slate-300">
+                        {label}
+                      </Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>

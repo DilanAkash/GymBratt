@@ -24,9 +24,10 @@
     - [x] Log sets (Reps/Weight/RPE).
     - [x] Rest Timer.
     - [x] Save to `workoutLogs` collection.
-- [ ] **History & Progress**:
-    - [ ] View Past Workouts.
-    - [ ] Weight/Body Fat logs.
+- [x] **History & Progress**:
+    - [x] View Past Workouts.
+    - [x] Weight/Body Fat logs.
+    - [x] Progress Photos.
     - [ ] Nutrition Logs (Basic).
 
 ## Phase 2: Gym Connection & Dual Mode (Weeks 4-5) 

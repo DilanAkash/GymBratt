@@ -9,8 +9,13 @@ import {
     updateDoc,
     serverTimestamp,
     getDoc,
-    onSnapshot
+    orderBy,
+    limit,
+    onSnapshot,
+    addDoc
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../firebase";
 import type { Program, ProgramDay } from "../mockPrograms";
 
 // Helper to sanitize undefined values for Firestore
@@ -89,5 +94,44 @@ export const programService = {
         const logsRef = collection(db, "users", userId, "workoutLogs");
         const newLogRef = doc(logsRef, log.id);
         await setDoc(newLogRef, sanitize(log));
+    },
+
+    // Fetch workout logs
+    getWorkoutLogs: async (userId: string): Promise<any[]> => {
+        const logsRef = collection(db, "users", userId, "workoutLogs");
+        const q = query(logsRef, orderBy("date", "desc"), limit(50));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+    },
+
+    // Progress Entries
+    addProgressEntry: async (userId: string, entry: any): Promise<void> => {
+        const entriesRef = collection(db, "users", userId, "progressEntries");
+        await addDoc(entriesRef, sanitize(entry));
+    },
+
+    getProgressEntries: async (userId: string): Promise<any[]> => {
+        const entriesRef = collection(db, "users", userId, "progressEntries");
+        const q = query(entriesRef, orderBy("date", "desc"), limit(30));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+    },
+
+    // Upload photo
+    uploadProgressPhoto: async (userId: string, uri: string): Promise<string> => {
+        try {
+            const response = await fetch(uri);
+            const blob = await response.blob();
+
+            const filename = `progress/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+            const storageRef = ref(storage, `users/${userId}/${filename}`);
+
+            await uploadBytes(storageRef, blob);
+            const downloadURL = await getDownloadURL(storageRef);
+            return downloadURL;
+        } catch (error) {
+            console.error("Error uploading photo:", error);
+            throw error;
+        }
     }
 };

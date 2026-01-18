@@ -215,6 +215,36 @@ export default function ProfileScreen() {
             />
           </TouchableOpacity>
 
+          {/* History */}
+          <TouchableOpacity
+            className="flex-row items-center justify-between border-t border-white/10 px-4 py-3.5"
+            activeOpacity={0.8}
+            onPress={() => router.push("/workout-history")}
+          >
+            <View className="flex-row items-center">
+              <View className="mr-3 h-9 w-9 items-center justify-center rounded-full bg-purple-500/10">
+                <Ionicons
+                  name="time-outline"
+                  size={18}
+                  color="#d8b4fe"
+                />
+              </View>
+              <View>
+                <Text className="text-sm font-medium text-slate-100">
+                  Workout History
+                </Text>
+                <Text className="text-xs text-slate-400">
+                  View past training sessions
+                </Text>
+              </View>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color="#4b5563"
+            />
+          </TouchableOpacity>
+
           {/* Attendance */}
           <TouchableOpacity
             className="flex-row items-center justify-between border-t border-white/10 px-4 py-3.5"

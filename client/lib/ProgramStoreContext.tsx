@@ -34,6 +34,10 @@ type ProgramStoreValue = {
   completeWorkoutDay: (programId: string, dayId: string) => Promise<void>;
   getNextWorkoutDay: (programId: string) => ProgramDay | undefined;
   logWorkout: (log: WorkoutLog) => Promise<void>;
+  getHistory: () => Promise<WorkoutLog[]>;
+  addProgressEntry: (entry: any) => Promise<void>;
+  getProgressEntries: () => Promise<any[]>;
+  uploadProgressPhoto: (uri: string) => Promise<string>;
 };
 
 const ProgramStoreContext = createContext<ProgramStoreValue | undefined>(
@@ -197,6 +201,27 @@ export const ProgramStoreProvider = ({
     await programService.addWorkoutLog(user.uid, safeLog);
   };
 
+  const getHistory = async (): Promise<WorkoutLog[]> => {
+    if (!user || !user.uid) return [];
+    return (await programService.getWorkoutLogs(user.uid)) as WorkoutLog[];
+  };
+
+  const addProgressEntry = async (entry: any) => {
+    if (!user || !user.uid) return;
+    const safeEntry = { ...entry, userId: user.uid };
+    await programService.addProgressEntry(user.uid, safeEntry);
+  };
+
+  const getProgressEntries = async (): Promise<any[]> => {
+    if (!user || !user.uid) return [];
+    return await programService.getProgressEntries(user.uid);
+  };
+
+  const uploadProgressPhoto = async (uri: string): Promise<string> => {
+    if (!user || !user.uid) throw new Error("User not authenticated");
+    return await programService.uploadProgressPhoto(user.uid, uri);
+  };
+
 
 
   return (
@@ -211,6 +236,10 @@ export const ProgramStoreProvider = ({
         completeWorkoutDay,
         getNextWorkoutDay,
         logWorkout,
+        getHistory,
+        addProgressEntry,
+        getProgressEntries,
+        uploadProgressPhoto,
       }}
     >
       {children}
