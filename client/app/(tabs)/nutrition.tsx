@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl } from "react-native";
+import { ScrollView, Text, TouchableOpacity, View, ActivityIndicator, RefreshControl, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import SuccessAnimation from "../../components/SuccessAnimation";
 import { useProgramStore } from "../../lib/ProgramStoreContext";
@@ -10,7 +10,7 @@ const PRIMARY = "#0df20d";
 
 export default function NutritionScreen() {
   const router = useRouter();
-  const { getDailyNutrition } = useProgramStore();
+  const { getDailyNutrition, deleteMeal } = useProgramStore();
   const [showSuccess, setShowSuccess] = useState(false);
   const [isDayFollowed, setIsDayFollowed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -47,9 +47,9 @@ export default function NutritionScreen() {
     let cals = 0, p = 0, c = 0, f = 0;
     logs.forEach(l => {
       cals += (l.calories || 0);
-      p += (l.macros?.protein || 0);
-      c += (l.macros?.carbs || 0);
-      f += (l.macros?.fats || 0);
+      p += (l.protein || 0);
+      c += (l.carbs || 0);
+      f += (l.fats || 0);
     });
     return { cals, p, c, f };
   }, [logs]);
@@ -64,7 +64,7 @@ export default function NutritionScreen() {
   const mappedMeals = logs.map(l => ({
     id: l.id,
     title: l.name,
-    description: `${l.type} • P: ${l.macros?.protein}g C: ${l.macros?.carbs}g F: ${l.macros?.fats}g`,
+    description: `${l.type} • P: ${l.protein}g C: ${l.carbs}g F: ${l.fats}g`,
     calories: l.calories,
     icon: l.type === 'breakfast' ? 'cafe-outline' : l.type === 'lunch' ? 'restaurant-outline' : l.type === 'dinner' ? 'pizza-outline' : 'ice-cream-outline'
   }));
@@ -78,6 +78,33 @@ export default function NutritionScreen() {
   const handleMarkFollowed = () => {
     setShowSuccess(true);
     setIsDayFollowed(true);
+  };
+
+  const handleDelete = (id: string) => {
+    Alert.alert(
+      "Delete Meal",
+      "Are you sure you want to delete this meal?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              if (deleteMeal) {
+                await deleteMeal(id);
+                loadData(); // Reload to refresh list
+              }
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete meal");
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -204,6 +231,8 @@ export default function NutritionScreen() {
                 className="flex-row items-center rounded-2xl border border-white/10 bg-slate-900/60 p-4"
                 activeOpacity={0.9}
                 onPress={() => handleMealPress(meal.id, meal.title)}
+                onLongPress={() => handleDelete(meal.id)}
+                delayLongPress={500}
               >
                 {/* Icon */}
                 <View className="mr-3 h-12 w-12 items-center justify-center rounded-lg bg-[rgba(57,255,20,0.14)]">
@@ -261,7 +290,7 @@ export default function NutritionScreen() {
             </View>
           </TouchableOpacity>
         </View>
-      </View>
-    </SafeAreaView>
+      </View >
+    </SafeAreaView >
   );
 }

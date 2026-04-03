@@ -9,6 +9,7 @@ import Animated, {
   withTiming
 } from "react-native-reanimated";
 import { useEffect, useState } from "react";
+import { useGym } from "../../lib/GymContext";
 
 const TAB_ICON_SIZE = 24;
 const ACTIVE_COLOR = "#0df20d";
@@ -101,6 +102,8 @@ function TabBar({ state, descriptors, navigation }: any) {
         if (route.name === "nutrition") iconName = isFocused ? "restaurant" : "restaurant-outline";
         if (route.name === "progress") iconName = isFocused ? "trending-up" : "trending-up-outline";
         if (route.name === "profile") iconName = isFocused ? "person" : "person-outline";
+        if (route.name === "gym") iconName = isFocused ? "business" : "business-outline";
+        if (route.name === "gym") iconName = isFocused ? "business" : "business-outline";
 
         return (
           <Pressable
@@ -127,7 +130,11 @@ function TabBar({ state, descriptors, navigation }: any) {
   );
 }
 
+
+
 export default function TabsLayout() {
+  const { isGymMode } = useGym();
+
   return (
     <Tabs
       screenOptions={{ headerShown: false }}
@@ -135,6 +142,10 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="workouts" options={{ title: "Workouts" }} />
+      {/* Show Gym tab only when enabled */}
+      {isGymMode && (
+        <Tabs.Screen name="gym" options={{ title: "Gym" }} />
+      )}
       <Tabs.Screen name="nutrition" options={{ title: "Nutrition" }} />
       <Tabs.Screen name="progress" options={{ title: "Progress" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />

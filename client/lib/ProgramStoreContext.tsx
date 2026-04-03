@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { useAppUser } from "./UserContext"; // Assumption: UserContext exists
 import { programService } from "./services/programService";
+import * as nutritionService from "./services/nutritionService";
 import {
   MOCK_PROGRAMS,
   type DayStatus,
@@ -40,6 +41,8 @@ type ProgramStoreValue = {
   uploadProgressPhoto: (uri: string) => Promise<string>;
   logMeal: (meal: any) => Promise<void>;
   getDailyNutrition: (dateArg: number) => Promise<any[]>;
+  deleteMeal: (id: string) => Promise<void>;
+  updateMeal: (id: string, updates: any) => Promise<void>;
 };
 
 const ProgramStoreContext = createContext<ProgramStoreValue | undefined>(
@@ -249,20 +252,27 @@ export const ProgramStoreProvider = ({
 
   const logMeal = async (meal: any) => {
     if (!user || !user.uid) return;
-    const safeMeal = { ...meal, userId: user.uid };
-    await programService.logMeal(user.uid, safeMeal);
+    // nutritionService takes Omit<Meal, 'id'>. The UID is handled inside the service using auth.currentUser
+    // but the service implementation currently uses auth.currentUser. 
+    // The previous implementation passed userId. 
+    // My new service uses auth.currentUser internally.
+    await nutritionService.addMeal(meal);
   };
 
   const getDailyNutrition = async (dateArg: number): Promise<any[]> => {
-    if (!user || !user.uid) return [];
-    // Start of day
-    const start = new Date(dateArg);
-    start.setHours(0, 0, 0, 0);
-    // End of day
-    const end = new Date(dateArg);
-    end.setHours(23, 59, 59, 999);
+    // nutritionService.getDailyNutrition takes a Date object and returns { date, total, meals }
+    // The previous implementation returned any[]. Consumers expect an array of logs?
+    // Let's check nutrition.tsx. It expects:
+    // const data = await getDailyNutrition(Date.now());
+    // setLogs(data);
+    // ... logs.forEach ...
+    // So nutrition.tsx expects an array of meals.
 
-    return await programService.getDailyNutrition(user.uid, start.getTime(), end.getTime());
+    // My service returns a NutritionDay object which has .meals property.
+    // So I should return that.
+
+    const dayData = await nutritionService.getDailyNutrition(new Date(dateArg));
+    return dayData.meals;
   };
 
 
@@ -285,6 +295,12 @@ export const ProgramStoreProvider = ({
         uploadProgressPhoto,
         logMeal,
         getDailyNutrition,
+        deleteMeal: async (id: string) => {
+          await nutritionService.deleteMeal(id);
+        },
+        updateMeal: async (id: string, updates: any) => {
+          await nutritionService.updateMeal(id, updates);
+        },
       }}
     >
       {children}

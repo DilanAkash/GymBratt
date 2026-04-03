@@ -4,6 +4,7 @@ import "../global.css";
 import { AttendanceProvider } from "../lib/AttendanceContext";
 import { ProgramStoreProvider } from "../lib/ProgramStoreContext";
 import { UserProvider, useAppUser } from "../lib/UserContext";
+import { GymProvider } from "../lib/GymContext";
 
 function RootLayoutNav() {
   const { user, loading } = useAppUser();
@@ -82,11 +83,13 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <UserProvider>
-      <ProgramStoreProvider>
-        <AttendanceProvider>
-          <RootLayoutNav />
-        </AttendanceProvider>
-      </ProgramStoreProvider>
+      <GymProvider>
+        <ProgramStoreProvider>
+          <AttendanceProvider>
+            <RootLayoutNav />
+          </AttendanceProvider>
+        </ProgramStoreProvider>
+      </GymProvider>
     </UserProvider>
   );
 }

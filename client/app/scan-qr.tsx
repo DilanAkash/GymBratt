@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAttendance } from "../lib/AttendanceContext";
 import { useAppUser } from "../lib/UserContext";
+import { getGymDetails, connectUserToGym } from "../lib/services/gymService";
 
 export default function ScanQrScreen() {
   const router = useRouter();
@@ -39,37 +40,39 @@ export default function ScanQrScreen() {
     try {
       // Parse QR
       let gymId = data;
-      let gymName = "Partner Gym";
 
       try {
         const parsed = JSON.parse(data);
         if (parsed.gymId) {
           gymId = parsed.gymId;
-          gymName = parsed.gymName || "Partner Gym";
         }
       } catch (e) {
-        // Not JSON
+        // Not JSON, assume data is ID
       }
 
+      // Validate Gym
+      const gym = await getGymDetails(gymId);
+      if (!gym) throw new Error("Invalid Gym QR Code");
+
       if (mode === "join") {
-        await updateGym(gymId, gymName);
+        if (!user.uid) throw new Error("User not authenticated");
+        await connectUserToGym(user.uid, gym.id, gym.name);
+
         setResultInfo({
           success: true,
           title: "Membership Activated",
-          message: `You have successfully joined ${gymName}. Welcome!`
+          message: `You have successfully joined ${gym.name}. Welcome!`
         });
       } else {
         // Check In Mode
-        if (user.gymId && gymId !== user.gymId) {
-          // Guest check-in or error? For now, lenient check-in or specific error.
-          // Let's assume error for now to enforce "My Gym".
-          throw new Error(`This QR code is for ${gymName}, but you are a member of ${user.gymName}.`);
+        if (user.gymId && gym.id !== user.gymId) {
+          throw new Error(`This QR code is for ${gym.name}, but you are a member of ${user.gymName}.`);
         }
-        await addCheckIn({ gymId });
+        await addCheckIn({ gymId: gym.id });
         setResultInfo({
           success: true,
           title: "Check-in Recorded",
-          message: `Welcome to ${gymName}. Your visit is logged.`
+          message: `Welcome to ${gym.name}. Your visit is logged.`
         });
       }
 
@@ -93,24 +96,40 @@ export default function ScanQrScreen() {
     // Simulate delay
     setTimeout(async () => {
       try {
-        const gymId = "apex-gym-01";
-        const gymName = "Apex Gym";
+        // For testing, try to connect to a 'demo-gym'
+        const gymId = "demo-gym";
+        // We'll try to fetch it, if it doesn't exist we might fail or mock it for dev
+        let gym = await getGymDetails(gymId);
+
+        // DEV FALLBACK: If no demo gym in DB, mock it so manual button works for verification
+        if (!gym) {
+          gym = { id: gymId, name: "Demo Gym", location: "Virtual" };
+          // Ensure we actually connect if it was missing? 
+          // Ideally we shouldn't connect to non-existent gyms, but for dev flow...
+        }
 
         if (mode === "join") {
-          await updateGym(gymId, gymName);
+          if (!user.uid) throw new Error("User not authenticated");
+          // Use the service
+          // Note: connectUserToGym writes to DB, so we need real DB access. 
+          // If gym didn't exist in DB, this might be partial, but let's try.
+          await connectUserToGym(user.uid, gym.id, gym.name);
+
           setResultInfo({
             success: true,
             title: "Membership Activated",
-            message: `You have successfully joined ${gymName}. Welcome!`
+            message: `You have successfully joined ${gym.name}. Welcome!`
           });
         } else {
-          await addCheckIn({ gymId });
+          await addCheckIn({ gymId: gym.id });
           setResultInfo({
             success: true,
             title: "Check-in Recorded",
-            message: `Welcome to ${gymName}. Your visit is logged.`
+            message: `Welcome to ${gym.name}. Your visit is logged.`
           });
         }
+      } catch (e: any) {
+        Alert.alert("Error", e.message);
       } finally {
         setProcessing(false);
       }

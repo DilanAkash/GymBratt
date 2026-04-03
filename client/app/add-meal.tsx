@@ -40,14 +40,12 @@ export default function AddMealScreen() {
         try {
             const meal = {
                 name,
-                date: Date.now(),
-                type: mealType.toLowerCase(),
+                timestamp: new Date(),
+                type: mealType.toLowerCase() as any,
                 calories: parseInt(calories) || 0,
-                macros: {
-                    protein: parseInt(protein) || 0,
-                    carbs: parseInt(carbs) || 0,
-                    fats: parseInt(fats) || 0,
-                }
+                protein: parseInt(protein) || 0,
+                carbs: parseInt(carbs) || 0,
+                fats: parseInt(fats) || 0,
             };
 
             await logMeal(meal);

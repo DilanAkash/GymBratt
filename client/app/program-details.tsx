@@ -152,21 +152,25 @@ export default function ProgramDetailsScreen() {
           </Text>
 
           <View className="flex-row gap-2">
-            <TouchableOpacity
-              onPress={handleDeleteProgram}
-              className="h-9 w-9 items-center justify-center rounded-full bg-white/10"
-            >
-              <Ionicons name="trash-outline" size={18} color="#ef4444" />
-            </TouchableOpacity>
+            {program.source !== 'coach' && (
+              <>
+                <TouchableOpacity
+                  onPress={handleDeleteProgram}
+                  className="h-9 w-9 items-center justify-center rounded-full bg-white/10"
+                >
+                  <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={handleEditProgram}
-              className="h-9 items-center justify-center rounded-full bg-white/10 px-3"
-            >
-              <Text className="text-[11px] font-semibold text-slate-100">
-                Edit
-              </Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleEditProgram}
+                  className="h-9 items-center justify-center rounded-full bg-white/10 px-3"
+                >
+                  <Text className="text-[11px] font-semibold text-slate-100">
+                    Edit
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -352,15 +356,17 @@ export default function ProgramDetailsScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            className="pointer-events-auto h-11 items-center justify-center rounded-xl border border-white/20 bg-white/5"
-            activeOpacity={0.9}
-            onPress={handleEditProgram}
-          >
-            <Text className="text-xs font-semibold text-slate-100">
-              Edit program structure
-            </Text>
-          </TouchableOpacity>
+          {program.source !== 'coach' && (
+            <TouchableOpacity
+              className="pointer-events-auto h-11 items-center justify-center rounded-xl border border-white/20 bg-white/5"
+              activeOpacity={0.9}
+              onPress={handleEditProgram}
+            >
+              <Text className="text-xs font-semibold text-slate-100">
+                Edit program structure
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </SafeAreaView>

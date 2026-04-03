@@ -11,12 +11,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAppUser } from "../../lib/UserContext";
 import { auth } from "../../lib/firebase";
+import { useGym } from "../../lib/GymContext";
 
 const PRIMARY = "#0df20d";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, resetUser } = useAppUser();
+  const { currentGym, isGymMode, toggleGymMode } = useGym();
 
   const resolvedUser = {
     name: user.fullName || "Member",
@@ -115,6 +117,35 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        {/* Gym Mode Toggle */}
+        {currentGym && (
+          <View className="mb-5 rounded-3xl border border-white/10 bg-gradient-to-r from-white/5 to-purple-500/10 p-1">
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={toggleGymMode}
+              className="flex-row items-center justify-between p-4"
+            >
+              <View className="flex-row items-center gap-3">
+                <View className={`h-10 w-10 items-center justify-center rounded-full ${isGymMode ? 'bg-purple-500' : 'bg-slate-700'}`}>
+                  <Ionicons name={isGymMode ? "business" : "person"} size={20} color="white" />
+                </View>
+                <View>
+                  <Text className="text-base font-bold text-white">
+                    {isGymMode ? "Gym Mode Active" : "Personal Mode"}
+                  </Text>
+                  <Text className="text-xs text-slate-400">
+                    {isGymMode ? `Connected to ${currentGym.name}` : "Tap to switch to Gym Mode"}
+                  </Text>
+                </View>
+              </View>
+
+              <View className={`h-6 w-11 rounded-full ${isGymMode ? 'bg-purple-500' : 'bg-slate-600'} p-1`}>
+                <View className={`h-4 w-4 rounded-full bg-white transition-all ${isGymMode ? 'translate-x-5' : 'translate-x-0'}`} />
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Quick stats */}
         <View className="mb-5 grid grid-cols-3 gap-3">
